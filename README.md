@@ -191,7 +191,17 @@ agentpay-guard/
 5.  **Attack Demo**: Automated scenarios. Done when: Overspend, unknown merchant, split-payments, and post-freeze actions all fail correctly.
 6.  **Optional AI**: LLM chooses/requests actions. Done when: Agent can operate autonomously without manual per-payment approval.
 
-## 13. Team Members
+## 13.Run backend:
+```bash
+python -m venv .venv
+pip install -r requirements.txt
+alembic upgrade head
+python app/database/seed.py
+uvicorn app.main:app --reload
+```
+
+
+## 14. Team Members
 
 - Shravani Tanksale
 - Vidyankshini Vibhute
