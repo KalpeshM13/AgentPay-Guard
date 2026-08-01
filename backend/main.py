@@ -81,6 +81,8 @@ class PolicyUpdateSchema(BaseModel):
 
 class AllowlistUpdateSchema(BaseModel):
     merchant_id: str = Field(...)
+    display_name: str | None = Field(None)
+    destination_reference: str | None = Field(None)
 
 
 @app.post("/payments")
@@ -93,6 +95,9 @@ def process_payment(req: PaymentRequestSchema, db: Session = Depends(get_db)):
     is_approved, reason = evaluate_payment_request(
         db, req.agent_id, req.merchant_id, req.amount, req.request_id
     )
+
+    if reason == "DUPLICATE_REQUEST":
+        raise HTTPException(status_code=400, detail={"status": "BLOCKED", "reason": reason})
 
     # 2. Log request in history
     db_request = PaymentRequest(
@@ -212,14 +217,22 @@ def add_to_allowlist(id: str, payload: AllowlistUpdateSchema, db: Session = Depe
     merchant = db.query(Merchant).filter(Merchant.id == payload.merchant_id).first()
     if not merchant:
         # Create merchant dynamically if it doesn't exist
+        display_name = payload.display_name or payload.merchant_id.replace("_", " ").title()
+        destination_reference = payload.destination_reference or f"acc_{payload.merchant_id}"
         merchant = Merchant(
             id=payload.merchant_id,
-            display_name=payload.merchant_id.replace("_", " ").title(),
-            destination_reference=f"acc_{payload.merchant_id}"
+            display_name=display_name,
+            destination_reference=destination_reference
         )
         db.add(merchant)
         db.commit()
         db.refresh(merchant)
+    else:
+        if payload.display_name:
+            merchant.display_name = payload.display_name
+        if payload.destination_reference:
+            merchant.destination_reference = payload.destination_reference
+        db.commit()
         
     if merchant not in agent.allowlist:
         agent.allowlist.append(merchant)
@@ -281,7 +294,13 @@ def get_agent_details(id: str, db: Session = Depends(get_db)):
         "daily_limit": agent.daily_limit,
         "spent_today": spent_today,
         "remaining_daily_limit": remaining_daily,
-        "allowlist": [m.id for m in agent.allowlist]
+        "allowlist": [
+            {
+                "id": m.id,
+                "display_name": m.display_name,
+                "destination_reference": m.destination_reference
+            } for m in agent.allowlist
+        ]
     }
 
 

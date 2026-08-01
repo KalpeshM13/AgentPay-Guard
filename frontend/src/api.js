@@ -58,7 +58,7 @@ export async function updatePolicy(id, perTxLimit, dailyLimit) {
   return response.json();
 }
 
-export async function addToAllowlist(id, merchantId) {
+export async function addToAllowlist(id, merchantId, displayName = null, destinationReference = null) {
   const response = await fetch(`${API_BASE_URL}/agents/${id}/allowlist`, {
     method: 'POST',
     headers: {
@@ -66,6 +66,8 @@ export async function addToAllowlist(id, merchantId) {
     },
     body: JSON.stringify({
       merchant_id: merchantId,
+      display_name: displayName,
+      destination_reference: destinationReference,
     }),
   });
   if (!response.ok) {

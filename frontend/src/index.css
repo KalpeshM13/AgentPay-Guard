@@ -481,3 +481,227 @@ body {
   font-size: 0.875rem;
   margin-bottom: 1.25rem;
 }
+
+/* Sidebar Layout */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+}
+
+.sidebar {
+  width: 300px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 1.5rem;
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  margin-bottom: 2.5rem;
+}
+
+.sidebar-logo h1 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sidebar-logo-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  margin-top: 0.25rem;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-grow: 1;
+}
+
+.sidebar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+}
+
+.sidebar-menu-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.sidebar-menu-item.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #60a5fa;
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 0 10px 10px 0;
+  padding-left: calc(1rem - 3px);
+}
+
+.sidebar-menu-item.active-frozen {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-left: 3px solid var(--accent-danger);
+  border-radius: 0 10px 10px 0;
+  padding-left: calc(1rem - 3px);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 2.5rem;
+  overflow-y: auto;
+  max-width: 1200px;
+  width: 100%;
+}
+
+/* Metamask Simulator */
+.metamask-simulator-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.metamask-simulator-card {
+  background: #1e1e24;
+  border: 1.5px solid #f6851b; /* Metamask Orange */
+  border-radius: 16px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+.metamask-header {
+  background: #24252c;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.metamask-logo-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metamask-logo-text {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.metamask-body {
+  padding: 1.5rem;
+}
+
+.metamask-network-badge {
+  background: rgba(246, 133, 27, 0.1);
+  color: #f6851b;
+  border: 1px solid rgba(246, 133, 27, 0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.metamask-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: #ffffff;
+}
+
+.metamask-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+}
+
+.metamask-tx-details {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.metamask-tx-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.metamask-tx-row:last-child {
+  margin-bottom: 0;
+}
+
+.metamask-tx-label {
+  color: var(--text-secondary);
+}
+
+.metamask-tx-value {
+  color: #ffffff;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.metamask-footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.btn-metamask-reject {
+  background: transparent;
+  border: 1.5px solid #f6851b;
+  color: #f6851b;
+}
+.btn-metamask-reject:hover {
+  background: rgba(246, 133, 27, 0.05);
+}
+
+.btn-metamask-confirm {
+  background: #f6851b;
+  color: #ffffff;
+}
+.btn-metamask-confirm:hover {
+  background: #e27613;
+  box-shadow: 0 0 12px rgba(246, 133, 27, 0.3);
+}

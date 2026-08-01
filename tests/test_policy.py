@@ -7,8 +7,8 @@ from backend.database import Base, get_db
 from backend.main import app
 from backend.models import Agent, Merchant
 
-# Setup an in-memory SQLite DB for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# Setup a temporary file SQLite DB for testing
+SQLALCHEMY_DATABASE_URL = "sqlite:///test_policy.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
