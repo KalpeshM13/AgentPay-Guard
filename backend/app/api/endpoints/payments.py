@@ -8,7 +8,6 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.payment_schemas import PaymentRequestSchema, PaymentResponse
 from app.db.session import get_session
@@ -54,7 +53,7 @@ The agent has no credentials and cannot bypass policy.
 )
 async def request_payment(
     body: PaymentRequestSchema,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
 ) -> PaymentResponse:
     """Process a payment request through the policy + executor pipeline."""
 
@@ -138,7 +137,7 @@ async def request_payment(
 # =============================================================================
 
 async def _record_duplicate_blocked(
-    session: AsyncSession,
+    session,
     body: PaymentRequestSchema,
 ) -> None:
     """Log a duplicate-request block (no new PaymentRequest — already exists)."""
@@ -165,42 +164,38 @@ async def _record_duplicate_blocked(
 
 
 async def _record_blocked(
-    session: AsyncSession,
+    session: any,
     body: PaymentRequestSchema,
     reason: str,
 ) -> None:
-    """Persist a BLOCKED PaymentRequest + AuditLog (fire-and-forget).
-
-    If a PaymentRequest with the same request_id already exists
-    (e.g. from a prior settlement), we skip the insert to avoid a
-    UNIQUE constraint violation.
-    """
+    """Persist a BLOCKED PaymentRequest + AuditLog in Firestore (fire-and-forget)."""
     import json
-
-    from sqlalchemy import select
+    from datetime import datetime, timezone
 
     from app.core.constants import AuditEventType
     from app.models.audit_log import AuditLog
     from app.models.payment_request import PaymentRequest
 
     # Check if this request_id already exists
-    result = await session.execute(
-        select(PaymentRequest).where(PaymentRequest.request_id == body.request_id)
-    )
-    existing = result.scalar_one_or_none()
+    results = await session.query("payment_requests", [("request_id", "==", body.request_id)])
 
-    if existing is None:
+    if not results:
+        pr_id = await session.get_next_id("payment_requests")
         pr = PaymentRequest(
+            id=pr_id,
             request_id=body.request_id,
             agent_id=body.agent_id,
             merchant_id=body.merchant_id,
             amount=body.amount,
             status="BLOCKED",
             reason=reason,
+            created_at=datetime.now(timezone.utc),
         )
-        session.add(pr)
+        await session.insert("payment_requests", pr_id, pr.to_dict())
 
+    audit_id = await session.get_next_id("audit_events")
     audit = AuditLog(
+        id=audit_id,
         actor=f"agent:{body.agent_id}",
         event_type=AuditEventType.PAYMENT_BLOCKED.value,
         details=json.dumps({
@@ -210,9 +205,9 @@ async def _record_blocked(
             "amount": body.amount,
             "reason": reason,
         }),
+        timestamp=datetime.now(timezone.utc),
     )
-    session.add(audit)
-    await session.commit()
+    await session.insert("audit_events", audit_id, audit.to_dict())
     logger.info(
         "Payment BLOCKED: request=%s reason=%s", body.request_id, reason,
     )

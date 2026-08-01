@@ -223,12 +223,6 @@ Install the required Python dependencies:
 pip install -r requirements.txt
 ```
 
-Configure environment (defaults work out of the box)
-
-```bash
-cp .env.example .env
-```
-
 Launch the FastAPI backend server:
 
 ```bash

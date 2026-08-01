@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     )
     DB_ECHO: bool = False  # set True during development to see SQL queries
 
+    # -- Firebase ------------------------------------------------------------
+    FIREBASE_CREDENTIALS: str | None = None
+    FIREBASE_CREDENTIALS_PATH: str | None = None
+
     # -- Logging -------------------------------------------------------------
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     LOG_FORMAT: Literal["text", "json"] = "text"

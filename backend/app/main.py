@@ -40,10 +40,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # -- Shutdown: release DB connections ------------------------------------
-    from app.db.session import engine
-    await engine.dispose()
-
 
 # ---------------------------------------------------------------------------
 # FastAPI application instance

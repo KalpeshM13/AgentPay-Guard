@@ -7,7 +7,7 @@ Thin router: delegates everything to ``dashboard_service``.
 """
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.api.auth_deps import get_current_user
 from app.api.dashboard_schemas import (
@@ -41,7 +41,7 @@ Returns the high-level metrics the owner dashboard needs:
 """,
 )
 async def summary(
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> DashboardSummary:
     """Return dashboard KPIs."""
@@ -79,7 +79,7 @@ async def activity(
         description="Filter by payment status.",
     ),
     limit: int = Query(default=50, ge=1, le=200),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> ActivityResponse:
     """Return recent payment activity."""
@@ -114,7 +114,7 @@ async def audit_log(
         description="Filter by audit event type.",
     ),
     limit: int = Query(default=50, ge=1, le=200),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AuditResponse:
     """Return recent audit log entries."""

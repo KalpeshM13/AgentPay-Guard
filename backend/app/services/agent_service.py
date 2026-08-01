@@ -1,21 +1,38 @@
-"""Agent business logic — create, read, update, delete, freeze/unfreeze.
+"""Agent business logic — create, read, update, delete, freeze/unfreeze using Firestore.
 
-All database access goes through this module.  Routers only call these
-functions and return the result.
+All database access goes through this module.
 """
 
 import json
 import logging
-
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from datetime import datetime, timezone
 
 from app.core.constants import AgentStatus, AuditEventType
 from app.models.agent import Agent
 from app.models.audit_log import AuditLog
+from app.models.agent_merchant import AgentMerchant
+from app.models.merchant import Merchant
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Helper to load relationships
+# =============================================================================
+
+async def _load_agent_relations(session: any, agent: Agent) -> None:
+    """Fetch and attach allowlist entries and merchants for an agent."""
+    entries_data = await session.query("agent_allowlist", [("agent_id", "==", agent.id)])
+    allowlist_entries = []
+    for ed in entries_data:
+        entry = AgentMerchant(**ed)
+        m_data = await session.get("merchants", entry.merchant_id)
+        if m_data:
+            entry.merchant = Merchant(**m_data)
+        else:
+            entry.merchant = None
+        allowlist_entries.append(entry)
+    agent.allowlist_entries = allowlist_entries
 
 
 # =============================================================================
@@ -23,76 +40,74 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 async def get_agent_by_id(
-    session: AsyncSession, agent_id: int, *, load_allowlist: bool = True,
+    session: any, agent_id: int, *, load_allowlist: bool = True,
 ) -> Agent | None:
-    """Fetch a single agent by PK.  Eager-loads allowlist entries and merchants."""
-    from app.models.agent_merchant import AgentMerchant
-    stmt = select(Agent).where(Agent.id == agent_id)
-    stmt = stmt.options(
-        selectinload(Agent.allowlist_entries).selectinload(AgentMerchant.merchant)
-    )
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    """Fetch a single agent by PK. Eager-loads allowlist entries and merchants."""
+    data = await session.get("agents", agent_id)
+    if not data:
+        return None
+    agent = Agent(**data)
+    if load_allowlist:
+        await _load_agent_relations(session, agent)
+    return agent
 
 
-async def get_agent_by_name(session: AsyncSession, name: str) -> Agent | None:
+async def get_agent_by_name(session: any, name: str) -> Agent | None:
     """Fetch an agent by its unique name."""
-    result = await session.execute(select(Agent).where(Agent.name == name))
-    return result.scalar_one_or_none()
+    name_lower = name.strip().lower()
+    results = await session.query("agents", [("name_lower", "==", name_lower)])
+    if results:
+        agent = Agent(**results[0])
+        await _load_agent_relations(session, agent)
+        return agent
+    return None
 
 
 async def get_agent_by_identifier(
-    session: AsyncSession, identifier: str | int
+    session: any, identifier: str | int
 ) -> Agent | None:
-    """Fetch a single agent by PK (if integer-like) or by name (case-insensitively, with normalization)."""
-    from app.models.agent_merchant import AgentMerchant
-    
+    """Fetch a single agent by PK (if integer-like) or by name (case-insensitively)."""
     try:
         agent_id = int(identifier)
-        stmt = select(Agent).where(Agent.id == agent_id)
+        return await get_agent_by_id(session, agent_id)
     except ValueError:
-        name_str = str(identifier).strip()
-        normalized_1 = name_str.lower()
-        normalized_2 = name_str.lower().replace("_", "-")
-        normalized_3 = name_str.lower().replace("-", "_")
-        
-        stmt = select(Agent).where(
-            (func.lower(Agent.name) == normalized_1) |
-            (func.lower(Agent.name) == normalized_2) |
-            (func.lower(Agent.name) == normalized_3)
-        )
-
-    stmt = stmt.options(
-        selectinload(Agent.allowlist_entries).selectinload(AgentMerchant.merchant)
-    )
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
-
+        name_str = str(identifier).strip().lower()
+        # Query normal, replace underscores/hyphens for fuzzy matches
+        for n_str in [name_str, name_str.replace("_", "-"), name_str.replace("-", "_")]:
+            results = await session.query("agents", [("name_lower", "==", n_str)])
+            if results:
+                agent = Agent(**results[0])
+                await _load_agent_relations(session, agent)
+                return agent
+        return None
 
 
 async def list_agents(
-    session: AsyncSession,
+    session: any,
     *,
     status: AgentStatus | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> tuple[list[Agent], int]:
     """Return a page of agents with an optional status filter, ordered by id."""
-    from app.models.agent_merchant import AgentMerchant
-    stmt = select(Agent)
-    count_stmt = select(func.count(Agent.id))
-
+    filters = []
     if status is not None:
-        stmt = stmt.where(Agent.status == status)
-        count_stmt = count_stmt.where(Agent.status == status)
-
-    total = (await session.execute(count_stmt)).scalar_one()
-    stmt = stmt.order_by(Agent.id).offset(skip).limit(limit)
-    stmt = stmt.options(
-        selectinload(Agent.allowlist_entries).selectinload(AgentMerchant.merchant)
-    )
-    agents = (await session.execute(stmt)).scalars().all()
-    return list(agents), total
+        filters.append(("status", "==", status.value if isinstance(status, AgentStatus) else status))
+        
+    # Get total count (using lightweight query or just fetching all if database is small)
+    all_matching = await session.query("agents", filters=filters)
+    total = len(all_matching)
+    
+    # Query with offset & limit
+    matching_page = await session.query("agents", filters=filters, order_by="id", limit=limit, offset=skip)
+    
+    agents = []
+    for data in matching_page:
+        agent = Agent(**data)
+        await _load_agent_relations(session, agent)
+        agents.append(agent)
+        
+    return agents, total
 
 
 # =============================================================================
@@ -100,7 +115,7 @@ async def list_agents(
 # =============================================================================
 
 async def create_agent(
-    session: AsyncSession,
+    session: any,
     *,
     name: str,
     description: str | None,
@@ -109,21 +124,24 @@ async def create_agent(
     daily_limit: float,
     max_requests_per_minute: int,
 ) -> Agent:
-    """Create a new agent and persist it."""
+    """Create a new agent and persist it in Firestore."""
+    next_id = await session.get_next_id("agents")
     agent = Agent(
+        id=next_id,
         name=name.strip(),
+        name_lower=name.strip().lower(),
         description=description.strip() if description else None,
         status=AgentStatus.ACTIVE,
         balance=balance,
         per_transaction_limit=per_transaction_limit,
         daily_limit=daily_limit,
         max_requests_per_minute=max_requests_per_minute,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
-    session.add(agent)
-    await session.commit()
-    await session.refresh(agent)
+    await session.insert("agents", next_id, agent.to_dict())
 
-    _write_audit(
+    await _write_audit(
         session, actor="system", event_type=AuditEventType.AGENT_CREATED,
         details={
             "agent_id": agent.id, "name": agent.name,
@@ -132,7 +150,6 @@ async def create_agent(
             "daily_limit": agent.daily_limit,
         },
     )
-    await session.commit()
 
     logger.info(
         "Agent created: id=%d name=%s balance=%.2f per_tx=%.2f daily=%.2f",
@@ -143,7 +160,7 @@ async def create_agent(
 
 
 async def update_agent(
-    session: AsyncSession,
+    session: any,
     agent: Agent,
     *,
     name: str | None = None,
@@ -153,12 +170,13 @@ async def update_agent(
     daily_limit: float | None = None,
     max_requests_per_minute: int | None = None,
 ) -> Agent:
-    """Partially update an agent's fields.  Only non-None values are applied."""
+    """Partially update an agent's fields. Only non-None values are applied."""
     changed = []
     policy_changed = {}
 
     if name is not None:
         agent.name = name.strip()
+        agent.name_lower = name.strip().lower()
         changed.append("name")
     if description is not None:
         agent.description = description.strip() or None
@@ -185,59 +203,61 @@ async def update_agent(
     if not changed:
         return agent
 
-    await session.commit()
-    await session.refresh(agent)
+    agent.updated_at = datetime.now(timezone.utc)
+    await session.update("agents", agent.id, agent.to_dict())
 
     if policy_changed:
-        _write_audit(
+        await _write_audit(
             session, actor="system", event_type=AuditEventType.POLICY_UPDATED,
             details={
                 "agent_id": agent.id, "agent_name": agent.name,
                 "changes": policy_changed,
             },
         )
-        await session.commit()
 
-    logger.info("Agent %d updated: %s", agent.id, ", ".join(changed))
+    logger.info("Agent %d updated in Firestore: %s", agent.id, ", ".join(changed))
     return agent
 
 
-async def delete_agent(session: AsyncSession, agent: Agent) -> None:
-    """Delete an agent (and cascade to allowlist entries)."""
+async def delete_agent(session: any, agent: Agent) -> None:
+    """Delete an agent (and cascade to allowlist entries in Firestore)."""
     agent_id = agent.id
     agent_name = agent.name
-    await session.delete(agent)
-    await session.commit()
+    
+    # Cascade delete allowlist entries
+    entries_data = await session.query("agent_allowlist", [("agent_id", "==", agent_id)])
+    for ed in entries_data:
+        await session.delete("agent_allowlist", ed["id"])
+        
+    await session.delete("agents", agent_id)
     logger.info("Agent deleted: id=%d name=%s", agent_id, agent_name)
 
 
-async def freeze_agent(session: AsyncSession, agent: Agent) -> Agent:
+async def freeze_agent(session: any, agent: Agent) -> Agent:
     """Set agent status to FROZEN — all future payment requests are blocked."""
     agent.status = AgentStatus.FROZEN
-    await session.commit()
-    await session.refresh(agent)
+    agent.updated_at = datetime.now(timezone.utc)
+    await session.update("agents", agent.id, agent.to_dict())
 
-    _write_audit(
+    await _write_audit(
         session, actor="system", event_type=AuditEventType.AGENT_FROZEN,
         details={"agent_id": agent.id, "agent_name": agent.name},
     )
-    await session.commit()
 
     logger.info("Agent %d FROZEN", agent.id)
     return agent
 
 
-async def unfreeze_agent(session: AsyncSession, agent: Agent) -> Agent:
+async def unfreeze_agent(session: any, agent: Agent) -> Agent:
     """Set agent status back to ACTIVE."""
     agent.status = AgentStatus.ACTIVE
-    await session.commit()
-    await session.refresh(agent)
+    agent.updated_at = datetime.now(timezone.utc)
+    await session.update("agents", agent.id, agent.to_dict())
 
-    _write_audit(
+    await _write_audit(
         session, actor="system", event_type=AuditEventType.AGENT_UNFROZEN,
         details={"agent_id": agent.id, "agent_name": agent.name},
     )
-    await session.commit()
 
     logger.info("Agent %d UNFROZEN", agent.id)
     return agent
@@ -247,18 +267,20 @@ async def unfreeze_agent(session: AsyncSession, agent: Agent) -> Agent:
 # Helpers
 # =============================================================================
 
-
-def _write_audit(
-    session: AsyncSession,
+async def _write_audit(
+    session: any,
     *,
     actor: str,
     event_type: AuditEventType,
     details: dict,
 ) -> None:
-    """Append an audit-log entry (fire-and-forget; caller flushes)."""
+    """Append an audit-log entry to Firestore."""
+    next_id = await session.get_next_id("audit_events")
     audit = AuditLog(
+        id=next_id,
         actor=actor,
         event_type=event_type.value,
         details=json.dumps(details),
+        timestamp=datetime.now(timezone.utc),
     )
-    session.add(audit)
+    await session.insert("audit_events", next_id, audit.to_dict())

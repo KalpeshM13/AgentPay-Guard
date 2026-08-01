@@ -1,12 +1,10 @@
-"""Merchant business logic — create, read, delete counterparties.
+"""Merchant business logic — create, read, delete counterparties using Firestore.
 
 All database access goes through this module.
 """
 
 import logging
-
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 
 from app.models.merchant import Merchant
 
@@ -18,44 +16,42 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 async def get_merchant_by_id(
-    session: AsyncSession, merchant_id: int,
+    session: any, merchant_id: int,
 ) -> Merchant | None:
     """Fetch a merchant by PK."""
-    result = await session.execute(
-        select(Merchant).where(Merchant.id == merchant_id)
-    )
-    return result.scalar_one_or_none()
+    data = await session.get("merchants", merchant_id)
+    if data:
+        return Merchant(**data)
+    return None
 
 
 async def get_merchant_by_name(
-    session: AsyncSession, display_name: str,
+    session: any, display_name: str,
 ) -> Merchant | None:
-    """Fetch a merchant by its unique display name."""
-    result = await session.execute(
-        select(Merchant).where(Merchant.display_name == display_name)
-    )
-    return result.scalar_one_or_none()
+    """Fetch a merchant by its unique display name (case-insensitive)."""
+    name_lower = display_name.strip().lower()
+    results = await session.query("merchants", [("display_name_lower", "==", name_lower)])
+    if results:
+        return Merchant(**results[0])
+    return None
 
 
 async def list_merchants(
-    session: AsyncSession, *, active_only: bool = False,
+    session: any, *, active_only: bool = False,
     skip: int = 0, limit: int = 100,
 ) -> tuple[list[Merchant], int]:
     """Return a page of merchants, ordered by id."""
-
-    stmt = select(Merchant)
-    count_stmt = select(func.count(Merchant.id))
-
+    filters = []
     if active_only:
-        stmt = stmt.where(Merchant.active.is_(True))
-        count_stmt = count_stmt.where(Merchant.active.is_(True))
+        filters.append(("active", "==", True))
 
-    total = (await session.execute(count_stmt)).scalar_one()
-    merchants = (
-        await session.execute(stmt.order_by(Merchant.id).offset(skip).limit(limit))
-    ).scalars().all()
+    all_matching = await session.query("merchants", filters=filters)
+    total = len(all_matching)
 
-    return list(merchants), total
+    matching_page = await session.query("merchants", filters=filters, order_by="id", limit=limit, offset=skip)
+    merchants = [Merchant(**data) for data in matching_page]
+
+    return merchants, total
 
 
 # =============================================================================
@@ -63,33 +59,41 @@ async def list_merchants(
 # =============================================================================
 
 async def create_merchant(
-    session: AsyncSession,
+    session: any,
     *,
     display_name: str,
     destination_reference: str,
     description: str | None = None,
 ) -> Merchant:
-    """Create a new merchant."""
+    """Create a new merchant in Firestore."""
+    next_id = await session.get_next_id("merchants")
     merchant = Merchant(
+        id=next_id,
         display_name=display_name.strip(),
+        display_name_lower=display_name.strip().lower(),
         destination_reference=destination_reference.strip(),
         description=description.strip() if description else None,
         active=True,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
-    session.add(merchant)
-    await session.commit()
-    await session.refresh(merchant)
+    await session.insert("merchants", next_id, merchant.to_dict())
     logger.info(
-        "Merchant created: id=%d name=%s ref=%s",
+        "Merchant created in Firestore: id=%d name=%s ref=%s",
         merchant.id, merchant.display_name, merchant.destination_reference,
     )
     return merchant
 
 
-async def delete_merchant(session: AsyncSession, merchant: Merchant) -> None:
-    """Delete a merchant (cascades to allowlist entries)."""
+async def delete_merchant(session: any, merchant: Merchant) -> None:
+    """Delete a merchant (cascades to allowlist entries in Firestore)."""
     mid = merchant.id
     mname = merchant.display_name
-    await session.delete(merchant)
-    await session.commit()
-    logger.info("Merchant deleted: id=%d name=%s", mid, mname)
+    
+    # Cascade delete allowlist entries
+    entries_data = await session.query("agent_allowlist", [("merchant_id", "==", mid)])
+    for ed in entries_data:
+        await session.delete("agent_allowlist", ed["id"])
+        
+    await session.delete("merchants", mid)
+    logger.info("Merchant deleted from Firestore: id=%d name=%s", mid, mname)

@@ -1,21 +1,5 @@
-"""Agent-Merchant association table — maps to blueprint's ``agent_allowlist``.
-
-Each row represents one merchant that a specific agent is *allowed* to pay.
-"""
-
-from datetime import datetime
-from typing import TYPE_CHECKING
-
-from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from datetime import datetime, timezone
 from app.db.session import Base
-
-if TYPE_CHECKING:
-    from app.models.agent import Agent
-    from app.models.merchant import Merchant
-
-
 
 class AgentMerchant(Base):
     """Join table implementing the agent ←→ merchant allowlist.
@@ -24,29 +8,29 @@ class AgentMerchant(Base):
     approved.  The *agent* and *merchant* pair must be unique.
     """
 
-    __tablename__ = "agent_allowlist"
-    __table_args__ = (
-        UniqueConstraint("agent_id", "merchant_id", name="uq_agent_merchant"),
-    )
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not hasattr(self, "created_at") or self.created_at is None:
+            self.created_at = datetime.now(timezone.utc)
+        if not hasattr(self, "id"):
+            self.id = None
+        if not hasattr(self, "agent"):
+            self.agent = None
+        if not hasattr(self, "merchant"):
+            self.merchant = None
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+        # Convert timestamps from Firestore Timestamp objects
+        for attr in ["created_at"]:
+            if hasattr(self, attr):
+                v = getattr(self, attr)
+                if hasattr(v, "to_datetime"):
+                    setattr(self, attr, v.to_datetime())
 
-    # -- Foreign keys --------------------------------------------------------
-    agent_id: Mapped[int] = mapped_column(
-        ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True,
-    )
-    merchant_id: Mapped[int] = mapped_column(
-        ForeignKey("merchants.id", ondelete="CASCADE"), nullable=False, index=True,
-    )
-
-    # -- Relationships -------------------------------------------------------
-    agent: Mapped["Agent"] = relationship(back_populates="allowlist_entries")
-    merchant: Mapped["Merchant"] = relationship(back_populates="allowlist_entries")
-
-    # -- Timestamp -----------------------------------------------------------
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
-    )
+    def to_dict(self) -> dict:
+        data = super().to_dict()
+        data.pop("agent", None)
+        data.pop("merchant", None)
+        return data
 
     def __repr__(self) -> str:
-        return f"<AgentMerchant agent={self.agent_id} merchant={self.merchant_id}>"
+        return f"<AgentMerchant agent={getattr(self, 'agent_id', None)} merchant={getattr(self, 'merchant_id', None)}>"

@@ -1,4 +1,4 @@
-"""Authentication service — password hashing, JWT creation, and user CRUD.
+"""Authentication service — password hashing, JWT creation, and user CRUD using Firestore.
 
 This is the *only* module that touches bcrypt and jose libraries.
 """
@@ -8,8 +8,6 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import JWTError, jwt
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.user import User
@@ -84,55 +82,60 @@ def decode_access_token(token: str) -> int | None:
 
 
 # =============================================================================
-# User database operations
+# User database operations (Firestore)
 # =============================================================================
 
-async def get_user_by_id(session: AsyncSession, user_id: int) -> User | None:
+async def get_user_by_id(session: any, user_id: int) -> User | None:
     """Fetch a user by primary key."""
-    result = await session.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+    data = await session.get("users", user_id)
+    if data:
+        return User(**data)
+    return None
 
 
-async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
+async def get_user_by_email(session: any, email: str) -> User | None:
     """Fetch a user by email (case-insensitive)."""
-    result = await session.execute(
-        select(User).where(User.email == email.lower().strip())
-    )
-    return result.scalar_one_or_none()
+    email_normalized = email.lower().strip()
+    results = await session.query("users", [("email", "==", email_normalized)])
+    if results:
+        return User(**results[0])
+    return None
 
 
 async def register_user(
-    session: AsyncSession,
+    session: any,
     email: str,
     plain_password: str,
     display_name: str,
 ) -> User:
-    """Create a new user with a bcrypt-hashed password.
+    """Create a new user in Firestore with a bcrypt-hashed password.
 
     The caller **must** have checked that the email is not already taken.
     """
+    next_id = await session.get_next_id("users")
     user = User(
+        id=next_id,
         email=email.lower().strip(),
         hashed_password=hash_password(plain_password),
         display_name=display_name.strip(),
+        role="viewer",
+        is_active=True,
     )
-    session.add(user)
-    await session.commit()
-    await session.refresh(user)
-    logger.info("User registered: id=%d email=%s role=%s", user.id, user.email, user.role)
+    await session.insert("users", next_id, user.to_dict())
+    logger.info("User registered in Firestore: id=%d email=%s role=%s", user.id, user.email, user.role)
     return user
 
 
 async def authenticate_user(
-    session: AsyncSession, email: str, plain_password: str
+    session: any, email: str, plain_password: str
 ) -> User | None:
     """Verify credentials and return the User, or ``None`` on failure."""
     user = await get_user_by_email(session, email)
     if user is None:
         return None
-    if not user.is_active:
+    if not getattr(user, "is_active", True):
         logger.warning("Login attempt for inactive user id=%d", user.id)
         return None
-    if not verify_password(plain_password, user.hashed_password):
+    if not verify_password(plain_password, getattr(user, "hashed_password", "")):
         return None
     return user

@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.api.auth_deps import get_current_user
 from app.api.auth_schemas import (
@@ -58,7 +58,7 @@ to ``owner`` manually, or via the ``DEFAULT_OWNER_*`` env vars).
 )
 async def register(
     body: RegisterRequest,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
 ) -> User:
     """Register a new user."""
     # -- Duplicate check ----------------------------------------------------
@@ -111,7 +111,7 @@ this endpoint automatically.
 )
 async def login(
     form: OAuth2PasswordRequestForm = Depends(),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
 ) -> dict:
     """Authenticate via OAuth2 password flow and return a JWT access token."""
     user = await authenticate_user(session, form.username, form.password)

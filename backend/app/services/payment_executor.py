@@ -1,22 +1,7 @@
-"""Payment Executor — the only component allowed to move money.
+"""Payment Executor — the only component allowed to move money using Firestore.
 
-Design principle
-----------------
 The Executor **assumes policy approval has already been granted**.
-It never re-checks policy rules.  Its sole job is to:
-
-1.  Debit the agent's simulated wallet balance (within a DB transaction).
-2.  Record a ``PaymentRequest`` (status = SETTLED).
-3.  Record a ``Transaction`` with ``balance_before`` / ``balance_after``.
-4.  Write an ``AuditLog`` entry.
-
-Everything happens inside a single database transaction via
-``session.begin()`` — if any step fails, the entire payment rolls back.
-
-Independently testable
-----------------------
-The executor accepts any SQLAlchemy ``AsyncSession``, so tests can
-use an in-memory SQLite database without starting the FastAPI server.
+It never re-checks policy rules.
 """
 
 from __future__ import annotations
@@ -25,8 +10,6 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import AuditEventType
 from app.models.audit_log import AuditLog
@@ -43,47 +26,15 @@ logger = logging.getLogger(__name__)
 # Public API
 # =============================================================================
 
-
 async def execute(
     *,
-    session: AsyncSession,
+    session: any,
     agent: Agent,
     request_id: str,
     merchant_id: int,
     amount: float,
 ) -> Transaction:
-    """Execute an already-approved payment.
-
-    **The caller must have verified policy approval before calling this.**
-
-    Parameters
-    ----------
-    session : AsyncSession
-        An active SQLAlchemy async session.  The executor opens a nested
-        transaction inside it.
-    agent : Agent
-        The agent whose balance will be debited.  Must be an ORM instance
-        attached to *session*.
-    request_id : str
-        The client-supplied idempotency key.
-    merchant_id : int
-        The merchant being paid.
-    amount : float
-        The amount to debit (must be > 0).
-
-    Returns
-    -------
-    Transaction
-        The newly created transaction record (with ``balance_before`` and
-        ``balance_after`` populated).
-
-    Raises
-    ------
-    ValueError
-        If ``amount <= 0`` or ``agent.balance < amount`` (sanity guards;
-        policy should have caught these already).
-    """
-    # -- Sanity guards (should never fire if policy ran first) ---------------
+    """Execute an already-approved payment and update balance in Firestore."""
     if amount <= 0:
         raise ValueError(f"amount must be positive, got {amount}")
     if amount > agent.balance:
@@ -92,34 +43,37 @@ async def execute(
         )
 
     balance_before = agent.balance
-
-    # -- 1. Debit the simulated wallet ---------------------------------------
     agent.balance -= amount
-    session.add(agent)
 
-    # -- 2. Create PaymentRequest (status = SETTLED) -------------------------
+    # Get auto-incrementing integer IDs atomically
+    pr_id = await session.get_next_id("payment_requests")
+    tx_id = await session.get_next_id("transactions")
+    audit_id = await session.get_next_id("audit_events")
+
+    # Create model objects
     payment_request = PaymentRequest(
+        id=pr_id,
         request_id=request_id,
         agent_id=agent.id,
         merchant_id=merchant_id,
         amount=amount,
         status="SETTLED",
         reason=None,
+        created_at=datetime.now(timezone.utc),
     )
-    session.add(payment_request)
 
-    # -- 3. Create Transaction (ledger entry) --------------------------------
     transaction = Transaction(
+        id=tx_id,
         request_id=request_id,
         agent_id=agent.id,
         amount=amount,
         balance_before=balance_before,
         balance_after=agent.balance,
+        settled_at=datetime.now(timezone.utc),
     )
-    session.add(transaction)
 
-    # -- 4. Write AuditLog ---------------------------------------------------
     audit = AuditLog(
+        id=audit_id,
         actor=f"agent:{agent.id}",
         event_type=AuditEventType.PAYMENT_SETTLED.value,
         details=json.dumps({
@@ -130,12 +84,14 @@ async def execute(
             "balance_before": balance_before,
             "balance_after": agent.balance,
         }),
+        timestamp=datetime.now(timezone.utc),
     )
-    session.add(audit)
 
-    # -- 5. Commit the transaction -------------------------------------------
-    await session.commit()
-    await session.refresh(transaction)
+    # Persist all updates to Firestore
+    await session.update("agents", agent.id, agent.to_dict())
+    await session.insert("payment_requests", pr_id, payment_request.to_dict())
+    await session.insert("transactions", tx_id, transaction.to_dict())
+    await session.insert("audit_events", audit_id, audit.to_dict())
 
     logger.info(
         "Payment SETTLED: agent=%d merchant=%d amount=%.2f "
@@ -152,56 +108,61 @@ async def execute(
 # Query helpers (used by the policy engine callbacks and dashboard)
 # =============================================================================
 
-
-async def get_daily_spend(session: AsyncSession, agent_id: int) -> float:
-    """Return the total SETTLED spend for *agent_id* on the current UTC day.
-
-    Used as the ``get_daily_spend`` callback in ``PolicyContext``.
-    """
-    from sqlalchemy import func, select
-
+async def get_daily_spend(session: any, agent_id: int) -> float:
+    """Return the total SETTLED spend for *agent_id* on the current UTC day."""
     today = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0,
     )
-    result = await session.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0.0))
-        .where(
-            Transaction.agent_id == agent_id,
-            Transaction.settled_at >= today,
-        )
-    )
-    return float(result.scalar_one())
+    
+    # Query transactions for this agent
+    tx_list = await session.query("transactions", [("agent_id", "==", agent_id)])
+    
+    # Filter locally to avoid index requirements
+    total_spend = 0.0
+    for tx in tx_list:
+        settled_at = tx.get("settled_at")
+        if settled_at:
+            if hasattr(settled_at, "to_datetime"):
+                settled_at_dt = settled_at.to_datetime()
+            elif isinstance(settled_at, str):
+                settled_at_dt = datetime.fromisoformat(settled_at.replace("Z", "+00:00"))
+            else:
+                settled_at_dt = settled_at
+            
+            if settled_at_dt >= today:
+                total_spend += float(tx.get("amount", 0.0))
+                
+    return total_spend
 
 
 async def count_recent_requests(
-    session: AsyncSession, agent_id: int, window_start: datetime,
+    session: any, agent_id: int, window_start: datetime,
 ) -> int:
-    """Count payment requests since *window_start*.
-
-    Used as the ``count_recent_requests`` callback in ``PolicyContext``.
-    """
-    from sqlalchemy import func, select
-
-    result = await session.execute(
-        select(func.count(PaymentRequest.id))
-        .where(
-            PaymentRequest.agent_id == agent_id,
-            PaymentRequest.created_at >= window_start,
-        )
-    )
-    return result.scalar_one()
+    """Count payment requests since *window_start*."""
+    # Query requests for this agent
+    req_list = await session.query("payment_requests", [("agent_id", "==", agent_id)])
+    
+    # Filter locally
+    count = 0
+    for pr in req_list:
+        created_at = pr.get("created_at")
+        if created_at:
+            if hasattr(created_at, "to_datetime"):
+                created_at_dt = created_at.to_datetime()
+            elif isinstance(created_at, str):
+                created_at_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            else:
+                created_at_dt = created_at
+                
+            if created_at_dt >= window_start:
+                count += 1
+                
+    return count
 
 
 async def is_duplicate_request_id(
-    session: AsyncSession, request_id: str,
+    session: any, request_id: str,
 ) -> bool:
-    """Check whether *request_id* has already been used.
-
-    Used as the ``is_duplicate_request_id`` callback in ``PolicyContext``.
-    """
-    from sqlalchemy import exists, select
-
-    result = await session.execute(
-        select(exists().where(PaymentRequest.request_id == request_id))
-    )
-    return bool(result.scalar_one())
+    """Check whether *request_id* has already been used."""
+    results = await session.query("payment_requests", [("request_id", "==", request_id)])
+    return len(results) > 0

@@ -9,23 +9,19 @@ with ``provider: "fallback"``.
 """
 
 from typing import Any
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.ai_schemas import AIExplanation, ExplainBlockedRequest, ExplainPolicyRequest
 from app.api.auth_deps import get_current_user
 from app.db.session import get_session
-from app.models.agent import Agent
-from app.models.audit_log import AuditLog
 from app.models.user import User
 from app.services.ai_service import (
     explain_blocked_payment,
     explain_policy,
     summarize_audit,
 )
-from app.services.ai.base import AIProvider
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -50,7 +46,7 @@ and what the owner can do.
 )
 async def explain_blocked(
     body: ExplainBlockedRequest,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     """Explain a blocked payment."""
@@ -81,7 +77,7 @@ Send the agent's policy details — only the fields you send are used.
 )
 async def explain_policy_route(
     body: ExplainPolicyRequest,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     """Explain a spending policy."""
@@ -124,25 +120,39 @@ async def summarize_audit_route(
         default=None, gt=0, description="Filter audit events by agent ID.",
     ),
     limit: int = Query(default=50, ge=1, le=200),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     """Summarise recent audit activity."""
-    stmt = select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit)
-
+    filters = []
     if agent_id is not None:
-        # Audit log stores agent_id inside details JSON; we do a rough filter
-        # by actor field ("agent:NNN").
-        stmt = stmt.where(AuditLog.actor == f"agent:{agent_id}")
+        filters.append(("actor", "==", f"agent:{agent_id}"))
 
-    rows = (await session.execute(stmt)).scalars().all()
+    # Fetch matching audit events, sort locally and limit
+    all_audits = await session.query("audit_events", filters=filters)
+    
+    def get_timestamp(audit):
+        ts = audit.get("timestamp")
+        if ts is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if hasattr(ts, "to_datetime"):
+            return ts.to_datetime()
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+        return ts
+        
+    all_audits.sort(key=get_timestamp, reverse=True)
+    rows = all_audits[:limit]
 
     events = [
         {
-            "event_type": r.event_type,
-            "actor": r.actor,
-            "details": r.details or "",
-            "timestamp": r.timestamp.isoformat() if r.timestamp else "",
+            "event_type": r.get("event_type"),
+            "actor": r.get("actor"),
+            "details": r.get("details") or "",
+            "timestamp": get_timestamp(r).isoformat(),
         }
         for r in rows
     ]

@@ -1,23 +1,12 @@
 """Authentication dependencies for FastAPI endpoints.
 
 These dependencies are used with ``Depends()`` to protect routes.
-
-Quick-reference:
-
-    from app.api.auth_deps import get_current_user, require_role
-
-    @router.get("/protected")
-    async def protected(user: User = Depends(get_current_user)): ...
-
-    @router.post("/admin-only")
-    async def admin_only(user: User = Depends(require_role("admin"))): ...
 """
 
 import logging
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import UserRole
 from app.db.session import get_session
@@ -41,7 +30,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 # ---------------------------------------------------------------------------
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
 ) -> User:
     """Dependency that returns the authenticated ``User`` from a JWT Bearer token.
 
@@ -49,26 +38,25 @@ async def get_current_user(
     """
 
     if token is None:
-        from sqlalchemy import select
         from app.core.config import settings
         from app.models.user import User
         from app.core.constants import UserRole
-        from app.services.auth_service import hash_password
+        from app.services.auth_service import hash_password, get_user_by_email
         
         email = settings.DEFAULT_OWNER_EMAIL.lower().strip()
-        result = await session.execute(select(User).where(User.email == email))
-        user = result.scalar_one_or_none()
+        user = await get_user_by_email(session, email)
+
         if user is None:
+            next_id = await session.get_next_id("users")
             user = User(
+                id=next_id,
                 email=email,
                 hashed_password=hash_password(settings.DEFAULT_OWNER_PASSWORD),
                 display_name="Default Owner",
                 role=UserRole.OWNER,
                 is_active=True,
             )
-            session.add(user)
-            await session.commit()
-            await session.refresh(user)
+            await session.insert("users", next_id, user.to_dict())
         return user
 
     # -- 1. Validate the JWT ------------------------------------------------
@@ -107,12 +95,9 @@ async def get_optional_user(
     token: str | None = Depends(
         OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
     ),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
 ) -> User | None:
-    """Like ``get_current_user`` but returns ``None`` for anonymous requests.
-
-    Useful for endpoints that behave differently for authenticated users.
-    """
+    """Like ``get_current_user`` but returns ``None`` for anonymous requests."""
     if token is None:
         return None
     user_id = decode_access_token(token)
@@ -125,25 +110,7 @@ async def get_optional_user(
 # Role-based authorization guard (factory)
 # ---------------------------------------------------------------------------
 def require_role(*allowed_roles: UserRole | str):
-    """Factory that returns a dependency requiring one of *allowed_roles*.
-
-    ***Order matters*** — this dependency **must** be called *after*
-    ``get_current_user`` (i.e. ``get_current_user`` resolves the user, then
-    ``require_role`` checks the role).
-
-    Usage::
-
-        OwnerOrAdmin = require_role("owner", "admin")
-
-        @router.delete("/agents/{id}")
-        async def delete_agent(
-            agent_id: str,
-            user: User = Depends(get_current_user),
-            _: None = Depends(OwnerOrAdmin),
-        ): ...
-
-    Or use the convenience pre-built guards below.
-    """
+    """Factory that returns a dependency requiring one of *allowed_roles*."""
     allowed = {UserRole(r) for r in allowed_roles}
 
     async def role_checker(user: User = Depends(get_current_user)) -> User:

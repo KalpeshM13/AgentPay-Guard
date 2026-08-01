@@ -8,7 +8,7 @@ authenticated user for reads).  Each endpoint delegates to the
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.api.auth_deps import RequireAdmin, get_current_user
 from app.api.crud_schemas import (
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
-async def populate_agent_limits(session: AsyncSession, agent) -> None:
+async def populate_agent_limits(session, agent) -> None:
     from app.services.payment_executor import get_daily_spend
     spent_today = await get_daily_spend(session, agent.id)
     agent.spent_today = spent_today
@@ -57,7 +57,7 @@ Creates a new AI agent with a simulated balance and spending limits.
 )
 async def create(
     body: AgentCreate,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Create an agent."""
@@ -99,7 +99,7 @@ async def list_all(
     ),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AgentListResponse:
     """List agents."""
@@ -138,7 +138,7 @@ async def list_all(
 )
 async def get_one(
     agent_id: str,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AgentResponse:
     """Get agent by ID or name."""
@@ -164,7 +164,7 @@ async def get_one(
 async def update_one(
     agent_id: str,
     body: AgentUpdate,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Partially update an agent."""
@@ -210,7 +210,7 @@ async def update_one(
 )
 async def delete_one(
     agent_id: str,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Delete an agent."""
@@ -233,7 +233,7 @@ async def delete_one(
 )
 async def freeze(
     agent_id: str,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Freeze an agent."""
@@ -258,7 +258,7 @@ async def freeze(
 )
 async def unfreeze(
     agent_id: str,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Unfreeze an agent."""
@@ -304,7 +304,7 @@ evaluated against the new limits.
 async def update_policy(
     agent_id: str,
     body: PolicyUpdate,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Update an agent's spending policy."""
@@ -352,7 +352,7 @@ class AgentTransactionItem(BaseModel):
 )
 async def get_agent_transactions(
     agent_id: str,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[AgentTransactionItem]:
     """Get transactions/payment requests for an agent."""
@@ -360,30 +360,39 @@ async def get_agent_transactions(
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
-    from app.models.payment_request import PaymentRequest
-    from sqlalchemy import select
-
-    stmt = (
-        select(PaymentRequest)
-        .where(PaymentRequest.agent_id == agent.id)
-        .order_by(PaymentRequest.created_at.desc())
-    )
-    result = await session.execute(stmt)
-    payment_requests = result.scalars().all()
+    from datetime import datetime, timezone
+    reqs_data = await session.query("payment_requests", [("agent_id", "==", agent.id)])
+    
+    # Sort locally by created_at desc
+    def get_created_at(pr_dict):
+        ca = pr_dict.get("created_at")
+        if ca is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if hasattr(ca, "to_datetime"):
+            return ca.to_datetime()
+        if isinstance(ca, str):
+            try:
+                return datetime.fromisoformat(ca.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+        return ca
+        
+    reqs_data.sort(key=get_created_at, reverse=True)
 
     items = []
-    for pr in payment_requests:
-        settled_at = pr.created_at if pr.status == "SETTLED" else None
+    for r in reqs_data:
+        created_at_dt = get_created_at(r)
+        settled_at = created_at_dt if r.get("status") == "SETTLED" else None
         items.append(
             AgentTransactionItem(
-                id=pr.id,
-                request_id=pr.request_id,
-                agent_id=pr.agent_id,
-                merchant_id=pr.merchant_id,
-                amount=pr.amount,
-                status=pr.status,
-                reason=pr.reason,
-                created_at=pr.created_at,
+                id=r.get("id"),
+                request_id=r.get("request_id"),
+                agent_id=r.get("agent_id"),
+                merchant_id=r.get("merchant_id"),
+                amount=r.get("amount"),
+                status=r.get("status"),
+                reason=r.get("reason"),
+                created_at=created_at_dt,
                 settled_at=settled_at,
             )
         )

@@ -1,16 +1,6 @@
-"""User ORM model with password hashing.
-
-Uses bcrypt via passlib-alike API for secure password storage.
-"""
-
 from datetime import datetime, timezone
-
-from sqlalchemy import DateTime, Enum, String, func
-from sqlalchemy.orm import Mapped, mapped_column
-
 from app.core.constants import UserRole
 from app.db.session import Base
-
 
 class User(Base):
     """Owner/operator of the AgentPay Guard platform.
@@ -21,37 +11,31 @@ class User(Base):
     - ``viewer`` — read-only access to dashboards and logs
     """
 
-    __tablename__ = "users"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not hasattr(self, "created_at") or self.created_at is None:
+            self.created_at = datetime.now(timezone.utc)
+        if not hasattr(self, "updated_at") or self.updated_at is None:
+            self.updated_at = datetime.now(timezone.utc)
+        # Set defaults if not provided
+        if not hasattr(self, "id"):
+            self.id = None
+        if not hasattr(self, "is_active"):
+            self.is_active = True
+        if not hasattr(self, "role"):
+            self.role = UserRole.VIEWER
+        
+        # Ensure role is UserRole enum type
+        if hasattr(self, "role") and isinstance(self.role, str):
+            self.role = UserRole(self.role)
 
-    # -- Columns --------------------------------------------------------------
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False, index=True
-    )
-    hashed_password: Mapped[str] = mapped_column(String(128), nullable=False)
-    display_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole), default=UserRole.VIEWER, nullable=False
-    )
-    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+        # Convert timestamps from Firestore Timestamp objects
+        for attr in ["created_at", "updated_at"]:
+            if hasattr(self, attr):
+                v = getattr(self, attr)
+                if hasattr(v, "to_datetime"):
+                    setattr(self, attr, v.to_datetime())
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    # -- repr -----------------------------------------------------------------
-    def __repr__(self) -> str:
-        return f"<User id={self.id} email={self.email!r} role={self.role.value!r}>"
-
-    # -- Properties -----------------------------------------------------------
     @property
     def is_owner(self) -> bool:
         return self.role == UserRole.OWNER
@@ -59,3 +43,13 @@ class User(Base):
     @property
     def is_admin(self) -> bool:
         return self.role in (UserRole.OWNER, UserRole.ADMIN)
+
+    def to_dict(self) -> dict:
+        data = super().to_dict()
+        if "role" in data and isinstance(data["role"], UserRole):
+            data["role"] = data["role"].value
+        return data
+
+    def __repr__(self) -> str:
+        role_val = self.role.value if isinstance(self.role, UserRole) else str(self.role)
+        return f"<User id={self.id} email={getattr(self, 'email', None)!r} role={role_val!r}>"

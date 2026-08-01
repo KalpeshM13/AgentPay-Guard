@@ -1,13 +1,10 @@
-"""Allowlist business logic — manage which merchants an agent can pay.
+"""Allowlist business logic — manage which merchants an agent can pay in Firestore.
 
 All database access goes through this module.
 """
 
 import logging
-
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from datetime import datetime, timezone
 
 from app.models.agent import Agent
 from app.models.agent_merchant import AgentMerchant
@@ -21,30 +18,36 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 async def list_allowlist(
-    session: AsyncSession, agent: Agent,
+    session: any, agent: Agent,
 ) -> list[AgentMerchant]:
     """Return all allowlist entries for *agent*, with the merchant eagerly loaded."""
-    result = await session.execute(
-        select(AgentMerchant)
-        .where(AgentMerchant.agent_id == agent.id)
-        .options(selectinload(AgentMerchant.merchant))
-        .order_by(AgentMerchant.id)
-    )
-    return list(result.scalars().all())
+    results = await session.query("agent_allowlist", [("agent_id", "==", agent.id)], order_by="id")
+    
+    allowlist_entries = []
+    for data in results:
+        entry = AgentMerchant(**data)
+        # Load merchant
+        m_data = await session.get("merchants", entry.merchant_id)
+        if m_data:
+            entry.merchant = Merchant(**m_data)
+        else:
+            entry.merchant = None
+        allowlist_entries.append(entry)
+        
+    return allowlist_entries
 
 
 async def get_allowlist_entry(
-    session: AsyncSession, agent_id: int, merchant_id: int,
+    session: any, agent_id: int, merchant_id: int,
 ) -> AgentMerchant | None:
     """Check whether a specific agent→merchant allowlist entry exists."""
-    result = await session.execute(
-        select(AgentMerchant)
-        .where(
-            AgentMerchant.agent_id == agent_id,
-            AgentMerchant.merchant_id == merchant_id,
-        )
+    results = await session.query(
+        "agent_allowlist",
+        [("agent_id", "==", agent_id), ("merchant_id", "==", merchant_id)]
     )
-    return result.scalar_one_or_none()
+    if results:
+        return AgentMerchant(**results[0])
+    return None
 
 
 # =============================================================================
@@ -52,23 +55,29 @@ async def get_allowlist_entry(
 # =============================================================================
 
 async def add_to_allowlist(
-    session: AsyncSession, agent: Agent, merchant: Merchant,
+    session: any, agent: Agent, merchant: Merchant,
 ) -> AgentMerchant:
-    """Add *merchant* to *agent*'s allowlist.
+    """Add *merchant* to *agent*'s allowlist in Firestore.
 
     Raises ``ValueError`` if the entry already exists.
     """
-    entry = AgentMerchant(agent_id=agent.id, merchant_id=merchant.id)
-    session.add(entry)
-    await session.commit()
-    await session.refresh(entry)
-    # Reload with merchant relationship
-    result = await session.execute(
-        select(AgentMerchant)
-        .where(AgentMerchant.id == entry.id)
-        .options(selectinload(AgentMerchant.merchant))
+    existing = await get_allowlist_entry(session, agent.id, merchant.id)
+    if existing is not None:
+        raise ValueError("Allowlist entry already exists.")
+        
+    next_id = await session.get_next_id("agent_allowlist")
+    entry = AgentMerchant(
+        id=next_id,
+        agent_id=agent.id,
+        merchant_id=merchant.id,
+        created_at=datetime.now(timezone.utc),
     )
-    entry = result.scalar_one()
+    await session.insert("agent_allowlist", next_id, entry.to_dict())
+    
+    # Attach loaded relationships for the returned object
+    entry.merchant = merchant
+    entry.agent = agent
+    
     logger.info(
         "Allowlist: agent %d (%s) now allowed to pay merchant %d (%s)",
         agent.id, agent.name, merchant.id, merchant.display_name,
@@ -77,13 +86,12 @@ async def add_to_allowlist(
 
 
 async def remove_from_allowlist(
-    session: AsyncSession, entry: AgentMerchant,
+    session: any, entry: AgentMerchant,
 ) -> None:
-    """Remove a specific allowlist entry."""
+    """Remove a specific allowlist entry from Firestore."""
     agent_id = entry.agent_id
     merchant_id = entry.merchant_id
-    await session.delete(entry)
-    await session.commit()
+    await session.delete("agent_allowlist", entry.id)
     logger.info(
         "Allowlist: removed agent %d → merchant %d", agent_id, merchant_id,
     )

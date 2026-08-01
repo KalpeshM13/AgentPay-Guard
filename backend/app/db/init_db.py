@@ -1,45 +1,36 @@
-"""Database initialization — create tables and seed a default owner.
+"""Database initialization for Firestore — seed default owner, agents, and merchants.
 
 Called once at application startup (see ``app/main.py`` lifespan).
 """
 
 import logging
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.config import settings
 from app.core.constants import UserRole
-from app.db.session import AsyncSessionLocal, Base, engine
-from app.models import User  # noqa: F401 — ensure all models are loaded
-from app.services.auth_service import get_user_by_email, hash_password
+from app.db.session import FirebaseClient
+from app.services.auth_service import get_user_by_email
 
 logger = logging.getLogger(__name__)
 
 
 async def init_db() -> None:
-    """Create all tables (if missing) and seed the default owner account.
+    """Seed the default owner account, agents and merchants to Firestore.
 
-    Safe to call repeatedly — the owner seed is idempotent.
+    Safe to call repeatedly — the seed is idempotent.
     """
+    session = FirebaseClient()
+    if session.db is None:
+        logger.warning("Firebase not initialized. Seeding skipped.")
+        return
 
-    # -- 1. Create tables ----------------------------------------------------
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created (if not already present).")
-
-    # -- 2. Seed default owner, agent and merchants --------------------------
-    async with AsyncSessionLocal() as session:
-        await _seed_default_owner(session)
-        await _seed_default_agent_and_merchants(session)
-        await session.commit()
-
+    # Seed default data
+    await _seed_default_owner(session)
+    await _seed_default_agent_and_merchants(session)
     logger.info("Database initialization complete.")
 
 
-async def _seed_default_owner(session: AsyncSession) -> None:
+async def _seed_default_owner(session: FirebaseClient) -> None:
     """Create the default owner account if it does not already exist."""
-
     email = settings.DEFAULT_OWNER_EMAIL.lower().strip()
     existing = await get_user_by_email(session, email)
 
@@ -47,28 +38,30 @@ async def _seed_default_owner(session: AsyncSession) -> None:
         logger.debug("Default owner already exists (id=%d).", existing.id)
         return
 
+    from app.services.auth_service import hash_password
     from app.models.user import User
-
+    
+    next_id = await session.get_next_id("users")
     user = User(
+        id=next_id,
         email=email,
         hashed_password=hash_password(settings.DEFAULT_OWNER_PASSWORD),
         display_name="Default Owner",
         role=UserRole.OWNER,
         is_active=True,
     )
-    session.add(user)
+    await session.insert("users", next_id, user.to_dict())
     logger.info(
         "Seeded default owner: email=%s role=%s (change password immediately!).",
         email,
-        UserRole.OWNER,
+        UserRole.OWNER.value,
     )
 
 
-async def _seed_default_agent_and_merchants(session: AsyncSession) -> None:
+async def _seed_default_agent_and_merchants(session: FirebaseClient) -> None:
     """Seed the default merchants, default agent, and establish allowlist links."""
     from app.models.agent import Agent
     from app.models.merchant import Merchant
-    from app.models.agent_merchant import AgentMerchant
     from app.core.constants import AgentStatus
 
     # 1. Seed merchants
@@ -82,25 +75,35 @@ async def _seed_default_agent_and_merchants(session: AsyncSession) -> None:
     
     seeded_merchants = []
     for mid, name, ref, desc in merchants_to_seed:
-        merchant = await session.get(Merchant, mid)
-        if merchant is None:
+        merchant_data = await session.get("merchants", mid)
+        if merchant_data is None:
             merchant = Merchant(
                 id=mid,
                 display_name=name,
+                display_name_lower=name.lower(),
                 destination_reference=ref,
                 description=desc,
                 active=True,
             )
-            session.add(merchant)
+            await session.insert("merchants", mid, merchant.to_dict())
             logger.info("Seeded merchant: id=%d name=%s", mid, name)
+        else:
+            merchant = Merchant(**merchant_data)
         seeded_merchants.append(merchant)
+        
+    # Ensure counters is set to at least 5 for merchants
+    counter_ref = session.db.collection("counters").document("merchants")
+    snapshot = counter_ref.get()
+    if not snapshot.exists or snapshot.get("value") < 5:
+        counter_ref.set({"value": 5})
     
     # 2. Seed agent
-    agent = await session.get(Agent, 1)
-    if agent is None:
+    agent_data = await session.get("agents", 1)
+    if agent_data is None:
         agent = Agent(
             id=1,
             name="Agent-01",
+            name_lower="agent-01",
             description="Default autonomous spending agent",
             status=AgentStatus.ACTIVE,
             balance=10.0,
@@ -108,27 +111,24 @@ async def _seed_default_agent_and_merchants(session: AsyncSession) -> None:
             daily_limit=5.0,
             max_requests_per_minute=10,
         )
-        session.add(agent)
+        await session.insert("agents", 1, agent.to_dict())
         logger.info("Seeded default agent: id=1 name=%s", agent.name)
-    
-    # Flush so generated identities resolve
-    await session.flush()
+        
+    # Ensure counters is set to at least 1 for agents
+    counter_ref_agents = session.db.collection("counters").document("agents")
+    snapshot_agents = counter_ref_agents.get()
+    if not snapshot_agents.exists or snapshot_agents.get("value") < 1:
+        counter_ref_agents.set({"value": 1})
 
     # 3. Associate all 4 merchants to the agent's allowlist
-    from sqlalchemy import select
     for merchant in seeded_merchants:
         if merchant.id == 5:
             continue
-        stmt = select(AgentMerchant).where(
-            AgentMerchant.agent_id == 1,
-            AgentMerchant.merchant_id == merchant.id
-        )
-        existing_link = (await session.execute(stmt)).scalar_one_or_none()
+        
+        from app.services.allowlist_service import get_allowlist_entry
+        existing_link = await get_allowlist_entry(session, 1, merchant.id)
         if existing_link is None:
-            link = AgentMerchant(
-                agent_id=1,
-                merchant_id=merchant.id
-            )
-            session.add(link)
+            from app.services.allowlist_service import add_to_allowlist
+            agent_obj = Agent(id=1, name="Agent-01")
+            await add_to_allowlist(session, agent_obj, merchant)
             logger.info("Added merchant %s to agent's allowlist", merchant.display_name)
-

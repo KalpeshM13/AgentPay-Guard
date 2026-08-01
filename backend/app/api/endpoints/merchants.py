@@ -9,7 +9,7 @@ Every endpoint delegates to ``merchant_service`` — no business logic here.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.api.auth_deps import RequireAdmin, get_current_user
 from app.api.crud_schemas import (
@@ -43,7 +43,7 @@ router = APIRouter(prefix="/merchants", tags=["merchants"])
 )
 async def create(
     body: MerchantCreate,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> MerchantResponse:
     """Create a merchant."""
@@ -79,7 +79,7 @@ async def list_all(
     ),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> MerchantListResponse:
     """List merchants."""
@@ -108,7 +108,7 @@ async def list_all(
 )
 async def delete_one(
     merchant_id: int,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Delete a merchant."""

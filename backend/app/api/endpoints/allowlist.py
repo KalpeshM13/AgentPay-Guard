@@ -11,7 +11,7 @@ Every endpoint delegates to ``allowlist_service`` — no business logic here.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.api.auth_deps import RequireAdmin, get_current_user
 from app.api.crud_schemas import (
@@ -43,7 +43,7 @@ router = APIRouter(tags=["allowlist"])
 )
 async def list_entries(
     agent_id: str,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AllowlistResponse:
     """List allowlist entries for an agent."""
@@ -87,7 +87,7 @@ async def list_entries(
 async def add_entry(
     agent_id: str,
     body: AllowlistAdd,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AllowlistEntryResponse:
     """Add a merchant to an agent's allowlist."""
@@ -139,7 +139,7 @@ async def add_entry(
 async def remove_entry(
     agent_id: str,
     merchant_id: int,
-    session: AsyncSession = Depends(get_session),
+    session = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Remove a merchant from an agent's allowlist."""

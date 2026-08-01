@@ -1,61 +1,30 @@
-"""SQLAlchemy async engine, session factory, and declarative Base.
+"""Firebase database session wrapper.
 
-All models inherit from ``Base``.  Every database interaction goes through
-the async session returned by ``get_session``.
+Provides a simple base class for models and a FastAPI dependency that yields a Firebase client.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
-
-from app.core.config import settings
+from app.db.firebase import FirebaseClient
 
 # ---------------------------------------------------------------------------
-# Async Engine
+# Declarative Base Mock
 # ---------------------------------------------------------------------------
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DB_ECHO,
-    # SQLite-specific: allow multi-threaded access (required for aiosqlite)
-    connect_args={"check_same_thread": False},
-)
+class Base:
+    """Base class for all models, replacing SQLAlchemy DeclarativeBase."""
+    
+    def __init__(self, **kwargs):
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
-# ---------------------------------------------------------------------------
-# Session Factory
-# ---------------------------------------------------------------------------
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
-
+    def to_dict(self) -> dict:
+        data = {}
+        for key, val in self.__dict__.items():
+            if not key.startswith("_"):
+                data[key] = val
+        return data
 
 # ---------------------------------------------------------------------------
-# Declarative Base
+# FastAPI dependency – yields a FirebaseClient
 # ---------------------------------------------------------------------------
-class Base(DeclarativeBase):
-    """Base class for all ORM models."""
-    pass
-
-
-# ---------------------------------------------------------------------------
-# FastAPI dependency – yields a session and closes it after the request
-# ---------------------------------------------------------------------------
-async def get_session() -> AsyncSession:  # type: ignore[misc]
-    """FastAPI dependency that provides an async database session.
-
-    Usage in a router::
-
-        from fastapi import Depends
-        from app.db.session import get_session
-
-        @router.get("/agents")
-        async def list_agents(session: AsyncSession = Depends(get_session)):
-            ...
-    """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+async def get_session():
+    """FastAPI dependency that provides a FirebaseClient database session."""
+    yield FirebaseClient()

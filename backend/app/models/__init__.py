@@ -1,7 +1,6 @@
-"""SQLAlchemy models package.
+"""Database models package.
 
-Import all models here so Alembic's autogenerate can discover them
-and ``Base.metadata.create_all`` creates all tables.
+Import all models here for clean namespace access throughout the app.
 """
 
 from app.models.agent import Agent
