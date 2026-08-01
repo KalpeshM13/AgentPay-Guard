@@ -298,17 +298,40 @@ export default function LandingPage() {
       {/* ── Hero ── */}
       <section className="lp-hero" id="hero">
         <div className="lp-hero-bg"></div>
+
+        {/* Floating blockchain coin decorations */}
+        <div className="lp-hero-coin coin-eth" aria-hidden="true">◆</div>
+        <div className="lp-hero-coin coin-btc" aria-hidden="true">₿</div>
+        <div className="lp-hero-coin coin-shield" aria-hidden="true">🛡</div>
+        <div className="lp-hero-coin coin-chain" aria-hidden="true">⛓</div>
+
         <div className="lp-hero-content">
+          {/* Crypto stat pills */}
+          <div className="lp-hero-stats" aria-label="Live market indicators">
+            <span className="lp-hero-stat-pill eth">
+              <span className="lp-hero-stat-dot"></span>
+              ETH / USDC · SECURED
+            </span>
+            <span className="lp-hero-stat-pill btc">
+              <span className="lp-hero-stat-dot"></span>
+              BTC · POLICY ACTIVE
+            </span>
+            <span className="lp-hero-stat-pill shield">
+              <span className="lp-hero-stat-dot"></span>
+              GUARD v1.0 · ONLINE
+            </span>
+          </div>
+
           <div className="lp-hero-badge">
             <span className="lp-hero-badge-dot"></span>
-            Autonomous Agent Security
+            Autonomous Agent Security · Blockchain Fintech
           </div>
           <h1>Kill Switch &amp; Policy-Enforced Payments for AI&nbsp;Agents</h1>
           <p className="lp-hero-sub">
             AgentPay Guard is an independent payment-control layer that sits
-            between your AI agents and the financial system. Enforce spending
-            limits, allowlist counterparties, and freeze rogue agents — all
-            without the agent having access to payment credentials.
+            between your AI agents and the financial system. Enforce ETH/crypto
+            spending limits, allowlist counterparties, and freeze rogue agents —
+            all without the agent having access to wallet credentials.
           </p>
           <div className="lp-hero-actions">
             <Link to="/dashboard" className="lp-btn-primary">
@@ -446,7 +469,7 @@ export default function LandingPage() {
               <div className="lp-arch-node-icon wallet">
                 <Wallet size={28} />
               </div>
-              <span className="lp-arch-node-label">Simulated Wallet</span>
+              <span className="lp-arch-node-label">◆ ETH Wallet</span>
             </div>
           </div>
         </div>
