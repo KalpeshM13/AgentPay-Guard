@@ -3,6 +3,7 @@
 venv/
 env/
 ENV/
+node_modules/
 
 # Python caching
 __pycache__/
