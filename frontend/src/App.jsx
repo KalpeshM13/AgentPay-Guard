@@ -456,19 +456,27 @@ export default function App() {
               <Database size={16} /> Transaction Explorer
             </button>
           </nav>
-
         </aside>
 
         {/* Main Content Area */}
         <main className="main-content">
           <div className="main-top-bar">
             <div className="top-bar-left">
-              <span className="breadcrumb">System Status / {activeScreen.toUpperCase()}</span>
+              <span className="breadcrumb">
+                System Status / {activeScreen.toUpperCase()}
+              </span>
             </div>
             <div className="top-bar-right">
-              <div className={`wallet-status-chip ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}>
-                <span className={`status-dot ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}></span>
-                <span>Wallet Status: <strong>{agent ? agent.status : "OFFLINE"}</strong></span>
+              <div
+                className={`wallet-status-chip ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}
+              >
+                <span
+                  className={`status-dot ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}
+                ></span>
+                <span>
+                  Wallet Status:{" "}
+                  <strong>{agent ? agent.status : "OFFLINE"}</strong>
+                </span>
               </div>
               <button
                 className="theme-toggle-btn"
@@ -777,9 +785,12 @@ export default function App() {
                                 </td>
                                 <td>
                                   <span
-                                    className={`tx-badge ${(tx.status === "APPROVED" || tx.status === "SETTLED") ? "approved" : "blocked"}`}
+                                    className={`tx-badge ${tx.status === "APPROVED" || tx.status === "SETTLED" ? "approved" : "blocked"}`}
                                   >
-                                    {(tx.status === "APPROVED" || tx.status === "SETTLED") ? "SUCCESS" : tx.status}
+                                    {tx.status === "APPROVED" ||
+                                    tx.status === "SETTLED"
+                                      ? "SUCCESS"
+                                      : tx.status}
                                   </span>
                                 </td>
                                 <td
@@ -1348,12 +1359,8 @@ export default function App() {
                         <option value="1">
                           Compute Provider (Allowlisted)
                         </option>
-                        <option value="2">
-                          API Provider (Allowlisted)
-                        </option>
-                        <option value="3">
-                          Vendor A (Allowlisted)
-                        </option>
+                        <option value="2">API Provider (Allowlisted)</option>
+                        <option value="3">Vendor A (Allowlisted)</option>
                         <option value="4">
                           AWS Cloud Services (Allowlisted)
                         </option>
@@ -1554,9 +1561,12 @@ export default function App() {
                             </td>
                             <td>
                               <span
-                                className={`tx-badge ${(tx.status === "APPROVED" || tx.status === "SETTLED") ? "approved" : "blocked"}`}
+                                className={`tx-badge ${tx.status === "APPROVED" || tx.status === "SETTLED" ? "approved" : "blocked"}`}
                               >
-                                {(tx.status === "APPROVED" || tx.status === "SETTLED") ? "SUCCESS" : tx.status}
+                                {tx.status === "APPROVED" ||
+                                tx.status === "SETTLED"
+                                  ? "SUCCESS"
+                                  : tx.status}
                               </span>
                             </td>
                             <td
@@ -1580,7 +1590,8 @@ export default function App() {
                                 : "Reverted"}
                             </td>
                             <td>
-                              {(tx.status === "APPROVED" || tx.status === "SETTLED") ? (
+                              {tx.status === "APPROVED" ||
+                              tx.status === "SETTLED" ? (
                                 <a
                                   href={`https://holesky.etherscan.io/tx/mock_${tx.request_id}`}
                                   target="_blank"

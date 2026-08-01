@@ -16,7 +16,7 @@ services:
   - type: web
     name: agentpay-guard
     runtime: python
-    region: oregon                        # closest to most users on free tier
+    region: oregon # closest to most users on free tier
     plan: free
 
     # ---- Source --------------------------------------------------------------
@@ -39,7 +39,7 @@ services:
 
       # Generate a real secret:  python -c "import secrets; print(secrets.token_hex(32))"
       - key: SECRET_KEY
-        sync: false                      # prompt on first deploy
+        sync: false # prompt on first deploy
 
       - key: DEFAULT_OWNER_EMAIL
         value: "admin@agentpay.dev"

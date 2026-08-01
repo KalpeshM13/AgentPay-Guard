@@ -300,10 +300,18 @@ export default function LandingPage() {
         <div className="lp-hero-bg"></div>
 
         {/* Floating blockchain coin decorations */}
-        <div className="lp-hero-coin coin-eth" aria-hidden="true">◆</div>
-        <div className="lp-hero-coin coin-btc" aria-hidden="true">₿</div>
-        <div className="lp-hero-coin coin-shield" aria-hidden="true">🛡</div>
-        <div className="lp-hero-coin coin-chain" aria-hidden="true">⛓</div>
+        <div className="lp-hero-coin coin-eth" aria-hidden="true">
+          ◆
+        </div>
+        <div className="lp-hero-coin coin-btc" aria-hidden="true">
+          ₿
+        </div>
+        <div className="lp-hero-coin coin-shield" aria-hidden="true">
+          🛡
+        </div>
+        <div className="lp-hero-coin coin-chain" aria-hidden="true">
+          ⛓
+        </div>
 
         <div className="lp-hero-content">
           {/* Crypto stat pills */}

@@ -228,6 +228,7 @@ Launch the FastAPI backend server:
 ```bash
 uvicorn app.main:app --reload
 ```
+
 The backend API documentation will be available at `http://127.0.0.1:8000/docs`
 
 ### 2. Run Frontend Dashboard
@@ -249,4 +250,5 @@ Start the Vite development server:
 ```bash
 npm run dev
 ```
+
 The frontend dashboard interface will be running locally at `http://localhost:5173/`
