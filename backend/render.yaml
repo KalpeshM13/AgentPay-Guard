@@ -1,0 +1,57 @@
+# =============================================================================
+# Render Blueprint — AgentPay Guard
+# =============================================================================
+# Auto-deploy from your Git repo:
+#   1. Push to GitHub / GitLab.
+#   2. Create a new Web Service on Render → "Blueprint" → point at this repo.
+#
+# Free-tier specs:
+#   - 512 MB RAM
+#   - Shared CPU
+#   - No persistent disk (SQLite lives on ephemeral filesystem — use
+#     a managed DB for production)
+# =============================================================================
+
+services:
+  - type: web
+    name: agentpay-guard
+    runtime: python
+    region: oregon                        # closest to most users on free tier
+    plan: free
+
+    # ---- Source --------------------------------------------------------------
+    buildCommand: |
+      pip install --no-cache-dir -r requirements.txt
+
+    startCommand: |
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level info --no-access-log
+
+    # ---- Environment ---------------------------------------------------------
+    envVars:
+      - key: APP_NAME
+        value: "AgentPay Guard"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: LOG_FORMAT
+        value: "text"
+
+      # Generate a real secret:  python -c "import secrets; print(secrets.token_hex(32))"
+      - key: SECRET_KEY
+        sync: false                      # prompt on first deploy
+
+      - key: DEFAULT_OWNER_EMAIL
+        value: "admin@agentpay.dev"
+      - key: DEFAULT_OWNER_PASSWORD
+        value: "admin123"
+
+      # ---- Database (SQLite on ephemeral disk — ok for demo / MVP) -----------
+      - key: DATABASE_URL
+        value: "sqlite+aiosqlite:///data/agentpay.db"
+
+      # ---- AI (optional — leave blank to disable) ----------------------------
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
