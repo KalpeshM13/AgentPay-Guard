@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -84,6 +85,9 @@ class AllowlistUpdateSchema(BaseModel):
     display_name: str | None = Field(None)
     destination_reference: str | None = Field(None)
 
+@app.get("/")
+def root():
+    return {"message": "API is running!"}
 
 @app.post("/payments")
 def process_payment(req: PaymentRequestSchema, db: Session = Depends(get_db)):
