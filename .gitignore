@@ -13,7 +13,6 @@ __pycache__/
 # Databases & local data
 *.db
 *.sqlite3
-data/
 
 # Environment variables & secrets
 .env

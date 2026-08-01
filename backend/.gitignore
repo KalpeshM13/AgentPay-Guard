@@ -17,9 +17,9 @@ venv/
 .env
 
 # Database
-data/*.db
-data/*.db-journal
-data/*.db-wal
+*.db
+*.db-journal
+*.db-wal
 
 # Testing
 .pytest_cache/
