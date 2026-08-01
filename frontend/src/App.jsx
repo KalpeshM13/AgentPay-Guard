@@ -466,9 +466,9 @@ export default function App() {
               <span className="breadcrumb">System Status / {activeScreen.toUpperCase()}</span>
             </div>
             <div className="top-bar-right">
-              <div className={`wallet-status-chip ${agent?.status === "ACTIVE" ? "active" : "frozen"}`}>
-                <span className={`status-dot ${agent?.status === "ACTIVE" ? "active" : "frozen"}`}></span>
-                <span>Wallet Status: <strong>{agent?.status}</strong></span>
+              <div className={`wallet-status-chip ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}>
+                <span className={`status-dot ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}></span>
+                <span>Wallet Status: <strong>{agent ? agent.status : "OFFLINE"}</strong></span>
               </div>
               <button
                 className="theme-toggle-btn"
