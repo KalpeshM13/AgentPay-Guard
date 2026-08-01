@@ -190,3 +190,10 @@ agentpay-guard/
 4.  **Dashboard**: Human controls + visibility. Done when: Limits/status/logs update from UI.
 5.  **Attack Demo**: Automated scenarios. Done when: Overspend, unknown merchant, split-payments, and post-freeze actions all fail correctly.
 6.  **Optional AI**: LLM chooses/requests actions. Done when: Agent can operate autonomously without manual per-payment approval.
+
+## 13. Team Members
+
+- Shravani Tanksale
+- Vidyankshini Vibhute
+- Kalpesh More
+- Satyam Kulkarni
