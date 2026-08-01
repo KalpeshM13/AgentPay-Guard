@@ -73,6 +73,11 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 # -- API Router — prefix all endpoints with /api/v1 --------------------------
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+app.include_router(api_router)  # root level registration for simple clients / test suite compatibility
+
+@app.get("/")
+def root():
+    return {"message": "API is running!"}
 
 # -- Health-check endpoint (outside the versioned API) -----------------------
 @app.get("/health", tags=["health"])

@@ -4,11 +4,16 @@ Maps to the blueprint's ``merchants`` table (Section 9).
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.agent_merchant import AgentMerchant
+
 
 
 class Merchant(Base):

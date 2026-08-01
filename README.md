@@ -198,7 +198,13 @@ Follow these steps to set up and launch both the backend service and the fronten
 
 ### 1. Run Backend Service
 
-First, navigate to the project root directory and initialize the Python environment:
+First, navigate to the `backend` directory:
+
+```bash
+cd backend
+```
+
+Initialize the Python environment:
 
 ```bash
 # Create a virtual environment
@@ -220,13 +226,13 @@ pip install -r requirements.txt
 Launch the FastAPI backend server:
 
 ```bash
-uvicorn backend.main:app --reload
+uvicorn app.main:app --reload
 ```
 The backend API documentation will be available at `http://127.0.0.1:8000/docs`
 
 ### 2. Run Frontend Dashboard
 
-Open a separate terminal window and navigate to the frontend directory:
+Open a separate terminal window and navigate to the `frontend` directory:
 
 ```bash
 cd frontend
@@ -243,4 +249,4 @@ Start the Vite development server:
 ```bash
 npm run dev
 ```
-The frontend interface will be running locally at `http://localhost:5173/`
+The frontend dashboard interface will be running locally at `http://localhost:5173/`

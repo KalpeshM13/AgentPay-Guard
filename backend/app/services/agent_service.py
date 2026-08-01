@@ -23,12 +23,14 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 async def get_agent_by_id(
-    session: AsyncSession, agent_id: int, *, load_allowlist: bool = False,
+    session: AsyncSession, agent_id: int, *, load_allowlist: bool = True,
 ) -> Agent | None:
-    """Fetch a single agent by PK.  Optionally eager-loads allowlist entries."""
+    """Fetch a single agent by PK.  Eager-loads allowlist entries and merchants."""
+    from app.models.agent_merchant import AgentMerchant
     stmt = select(Agent).where(Agent.id == agent_id)
-    if load_allowlist:
-        stmt = stmt.options(selectinload(Agent.allowlist_entries))
+    stmt = stmt.options(
+        selectinload(Agent.allowlist_entries).selectinload(AgentMerchant.merchant)
+    )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -39,6 +41,35 @@ async def get_agent_by_name(session: AsyncSession, name: str) -> Agent | None:
     return result.scalar_one_or_none()
 
 
+async def get_agent_by_identifier(
+    session: AsyncSession, identifier: str | int
+) -> Agent | None:
+    """Fetch a single agent by PK (if integer-like) or by name (case-insensitively, with normalization)."""
+    from app.models.agent_merchant import AgentMerchant
+    
+    try:
+        agent_id = int(identifier)
+        stmt = select(Agent).where(Agent.id == agent_id)
+    except ValueError:
+        name_str = str(identifier).strip()
+        normalized_1 = name_str.lower()
+        normalized_2 = name_str.lower().replace("_", "-")
+        normalized_3 = name_str.lower().replace("-", "_")
+        
+        stmt = select(Agent).where(
+            (func.lower(Agent.name) == normalized_1) |
+            (func.lower(Agent.name) == normalized_2) |
+            (func.lower(Agent.name) == normalized_3)
+        )
+
+    stmt = stmt.options(
+        selectinload(Agent.allowlist_entries).selectinload(AgentMerchant.merchant)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+
 async def list_agents(
     session: AsyncSession,
     *,
@@ -47,6 +78,7 @@ async def list_agents(
     limit: int = 100,
 ) -> tuple[list[Agent], int]:
     """Return a page of agents with an optional status filter, ordered by id."""
+    from app.models.agent_merchant import AgentMerchant
     stmt = select(Agent)
     count_stmt = select(func.count(Agent.id))
 
@@ -56,6 +88,9 @@ async def list_agents(
 
     total = (await session.execute(count_stmt)).scalar_one()
     stmt = stmt.order_by(Agent.id).offset(skip).limit(limit)
+    stmt = stmt.options(
+        selectinload(Agent.allowlist_entries).selectinload(AgentMerchant.merchant)
+    )
     agents = (await session.execute(stmt)).scalars().all()
     return list(agents), total
 

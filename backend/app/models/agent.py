@@ -4,12 +4,17 @@ Maps to the blueprint's ``agents`` table (Section 9).
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import AgentStatus
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.agent_merchant import AgentMerchant
+
 
 
 class Agent(Base):
@@ -60,6 +65,11 @@ class Agent(Base):
     allowlist_entries: Mapped[list["AgentMerchant"]] = relationship(
         back_populates="agent", cascade="all, delete-orphan",
     )
+
+    @property
+    def allowlist(self) -> list:
+        """Returns the list of allowlisted Merchant objects associated with this agent."""
+        return [entry.merchant for entry in self.allowlist_entries if entry.merchant is not None]
 
     # -- Timestamps ----------------------------------------------------------
     created_at: Mapped[datetime] = mapped_column(

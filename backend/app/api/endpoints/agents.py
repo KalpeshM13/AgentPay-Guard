@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
+async def populate_agent_limits(session: AsyncSession, agent) -> None:
+    from app.services.payment_executor import get_daily_spend
+    spent_today = await get_daily_spend(session, agent.id)
+    agent.spent_today = spent_today
+    agent.remaining_daily_limit = max(0.0, agent.daily_limit - spent_today)
+    agent.per_tx_limit = agent.per_transaction_limit
+
+
 # =============================================================================
 # POST /agents
 # =============================================================================
@@ -68,6 +76,7 @@ async def create(
         daily_limit=body.daily_limit,
         max_requests_per_minute=body.max_requests_per_minute,
     )
+    await populate_agent_limits(session, agent)
     return AgentResponse.model_validate(agent)
 
 
@@ -109,6 +118,8 @@ async def list_all(
     agents, total = await agent_service.list_agents(
         session, status=status_enum, skip=skip, limit=limit,
     )
+    for a in agents:
+        await populate_agent_limits(session, a)
     return AgentListResponse(
         total=total,
         agents=[AgentResponse.model_validate(a) for a in agents],
@@ -126,15 +137,17 @@ async def list_all(
     responses={404: {"description": "Agent not found."}},
 )
 async def get_one(
-    agent_id: int,
+    agent_id: str,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AgentResponse:
-    """Get agent by ID."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    """Get agent by ID or name."""
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
+    await populate_agent_limits(session, agent)
     return AgentResponse.model_validate(agent)
+
 
 
 # =============================================================================
@@ -149,13 +162,13 @@ async def get_one(
     responses={404: {"description": "Agent not found."}},
 )
 async def update_one(
-    agent_id: int,
+    agent_id: str,
     body: AgentUpdate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Partially update an agent."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -177,6 +190,7 @@ async def update_one(
         daily_limit=body.daily_limit,
         max_requests_per_minute=body.max_requests_per_minute,
     )
+    await populate_agent_limits(session, updated)
     return AgentResponse.model_validate(updated)
 
 
@@ -195,12 +209,12 @@ async def update_one(
     },
 )
 async def delete_one(
-    agent_id: int,
+    agent_id: str,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Delete an agent."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     await agent_service.delete_agent(session, agent)
@@ -218,15 +232,16 @@ async def delete_one(
     responses={404: {"description": "Agent not found."}},
 )
 async def freeze(
-    agent_id: int,
+    agent_id: str,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Freeze an agent."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     agent = await agent_service.freeze_agent(session, agent)
+    await populate_agent_limits(session, agent)
     return AgentResponse.model_validate(agent)
 
 
@@ -242,15 +257,16 @@ async def freeze(
     responses={404: {"description": "Agent not found."}},
 )
 async def unfreeze(
-    agent_id: int,
+    agent_id: str,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Unfreeze an agent."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     agent = await agent_service.unfreeze_agent(session, agent)
+    await populate_agent_limits(session, agent)
     return AgentResponse.model_validate(agent)
 
 
@@ -286,13 +302,13 @@ evaluated against the new limits.
     },
 )
 async def update_policy(
-    agent_id: int,
+    agent_id: str,
     body: PolicyUpdate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Update an agent's spending policy."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -303,4 +319,73 @@ async def update_policy(
         daily_limit=body.daily_limit,
         max_requests_per_minute=body.max_requests_per_minute,
     )
+    await populate_agent_limits(session, updated)
     return AgentResponse.model_validate(updated)
+
+
+# =============================================================================
+# GET /agents/{id}/transactions
+# =============================================================================
+
+from datetime import datetime
+from pydantic import BaseModel
+
+class AgentTransactionItem(BaseModel):
+    id: int
+    request_id: str
+    agent_id: int | None
+    merchant_id: int | None
+    amount: float
+    status: str
+    reason: str | None
+    created_at: datetime
+    settled_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+@router.get(
+    "/{agent_id}/transactions",
+    response_model=list[AgentTransactionItem],
+    summary="Get an agent's transaction history",
+    responses={404: {"description": "Agent not found."}},
+)
+async def get_agent_transactions(
+    agent_id: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[AgentTransactionItem]:
+    """Get transactions/payment requests for an agent."""
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
+
+    from app.models.payment_request import PaymentRequest
+    from sqlalchemy import select
+
+    stmt = (
+        select(PaymentRequest)
+        .where(PaymentRequest.agent_id == agent.id)
+        .order_by(PaymentRequest.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    payment_requests = result.scalars().all()
+
+    items = []
+    for pr in payment_requests:
+        settled_at = pr.created_at if pr.status == "SETTLED" else None
+        items.append(
+            AgentTransactionItem(
+                id=pr.id,
+                request_id=pr.request_id,
+                agent_id=pr.agent_id,
+                merchant_id=pr.merchant_id,
+                amount=pr.amount,
+                status=pr.status,
+                reason=pr.reason,
+                created_at=pr.created_at,
+                settled_at=settled_at,
+            )
+        )
+    return items
+

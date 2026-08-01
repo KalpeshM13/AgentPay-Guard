@@ -4,11 +4,17 @@ Each row represents one merchant that a specific agent is *allowed* to pay.
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.agent import Agent
+    from app.models.merchant import Merchant
+
 
 
 class AgentMerchant(Base):

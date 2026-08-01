@@ -121,6 +121,7 @@ class AgentResponse(BaseModel):
             "per_transaction_limit": 1000.0,
             "daily_limit": 5000.0,
             "max_requests_per_minute": 5,
+            "allowlist": [],
             "created_at": "2026-08-01T14:30:00Z",
             "updated_at": "2026-08-01T14:30:00Z"
         }
@@ -131,8 +132,12 @@ class AgentResponse(BaseModel):
     status: AgentStatus
     balance: float
     per_transaction_limit: float
+    per_tx_limit: float = 0.0
     daily_limit: float
     max_requests_per_minute: int
+    allowlist: list["MerchantResponse"] = Field(default=[])
+    spent_today: float = 0.0
+    remaining_daily_limit: float = 0.0
     created_at: datetime
     updated_at: datetime
 
@@ -290,3 +295,7 @@ class AllowlistResponse(BaseModel):
     agent_id: int
     total: int
     allowlist: list[AllowlistEntryResponse]
+
+
+# Rebuild model to resolve forward references
+AgentResponse.model_rebuild()

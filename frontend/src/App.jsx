@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   Shield,
   Zap,
@@ -23,7 +24,7 @@ import {
 } from "lucide-react";
 import * as api from "./api";
 
-const DEFAULT_AGENT_ID = "agent_01";
+const DEFAULT_AGENT_ID = 1;
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState("dashboard");
@@ -60,7 +61,7 @@ export default function App() {
   ]);
 
   // Custom transaction simulator input
-  const [simMerchantId, setSimMerchantId] = useState("compute_provider");
+  const [simMerchantId, setSimMerchantId] = useState("1");
   const [simAmount, setSimAmount] = useState("0.005");
 
   // Modals / forms state
@@ -297,26 +298,25 @@ export default function App() {
     }
   };
 
-  // Pre-programmed Attack Demo scripts
   const runPreprogrammedScenario = (scenario) => {
     switch (scenario) {
       case "standard":
-        triggerSimulation("compute_provider", 0.005);
+        triggerSimulation("1", 0.005);
         break;
       case "overspend":
-        triggerSimulation("compute_provider", 0.02);
+        triggerSimulation("1", 0.02);
         break;
       case "unknown":
-        triggerSimulation("unknown_merchant_x", 0.003);
+        triggerSimulation("5", 0.003);
         break;
       case "split":
         addLog(
           "info",
           "ATTACK SIMULATION: Launching split-payment bypass attempt...",
         );
-        triggerSimulation("compute_provider", 0.008);
-        setTimeout(() => triggerSimulation("compute_provider", 0.008), 800);
-        setTimeout(() => triggerSimulation("compute_provider", 0.008), 1600);
+        triggerSimulation("1", 0.008);
+        setTimeout(() => triggerSimulation("1", 0.008), 800);
+        setTimeout(() => triggerSimulation("1", 0.008), 1600);
         break;
       default:
         break;
@@ -366,7 +366,9 @@ export default function App() {
     <>
       <div className="mobile-header">
         <div className="mobile-brand">
-          <h1>AGENTPAY GUARD</h1>
+          <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
+            <h1>AGENTPAY GUARD</h1>
+          </Link>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <button
@@ -395,7 +397,9 @@ export default function App() {
         {/* Sidebar Navigation */}
         <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
           <div className="sidebar-logo">
-            <h1>AGENTPAY GUARD</h1>
+            <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
+              <h1>AGENTPAY GUARD</h1>
+            </Link>
             <div className="sidebar-logo-subtitle">
               On-Chain Security Shield
             </div>
@@ -773,9 +777,9 @@ export default function App() {
                                 </td>
                                 <td>
                                   <span
-                                    className={`tx-badge ${tx.status === "APPROVED" ? "approved" : "blocked"}`}
+                                    className={`tx-badge ${(tx.status === "APPROVED" || tx.status === "SETTLED") ? "approved" : "blocked"}`}
                                   >
-                                    {tx.status}
+                                    {(tx.status === "APPROVED" || tx.status === "SETTLED") ? "SUCCESS" : tx.status}
                                   </span>
                                 </td>
                                 <td
@@ -1341,30 +1345,27 @@ export default function App() {
                         onChange={(e) => setSimMerchantId(e.target.value)}
                         style={{ width: "100%", cursor: "pointer" }}
                       >
-                        <option value="compute_provider">
+                        <option value="1">
                           Compute Provider (Allowlisted)
                         </option>
-                        <option value="api_provider">
+                        <option value="2">
                           API Provider (Allowlisted)
                         </option>
-                        <option value="vendor_a">Vendor A (Allowlisted)</option>
-                        <option value="aws_demo">
+                        <option value="3">
+                          Vendor A (Allowlisted)
+                        </option>
+                        <option value="4">
                           AWS Cloud Services (Allowlisted)
                         </option>
                         {agent?.allowlist.map(
                           (m) =>
-                            ![
-                              "compute_provider",
-                              "api_provider",
-                              "vendor_a",
-                              "aws_demo",
-                            ].includes(m.id) && (
+                            ![1, 2, 3, 4, 5].includes(m.id) && (
                               <option key={m.id} value={m.id}>
                                 {m.display_name} (Custom Allowed)
                               </option>
                             ),
                         )}
-                        <option value="malicious_hacker">
+                        <option value="5">
                           Malicious Recipient (Not Allowlisted)
                         </option>
                       </select>
@@ -1553,9 +1554,9 @@ export default function App() {
                             </td>
                             <td>
                               <span
-                                className={`tx-badge ${tx.status === "APPROVED" ? "approved" : "blocked"}`}
+                                className={`tx-badge ${(tx.status === "APPROVED" || tx.status === "SETTLED") ? "approved" : "blocked"}`}
                               >
-                                {tx.status}
+                                {(tx.status === "APPROVED" || tx.status === "SETTLED") ? "SUCCESS" : tx.status}
                               </span>
                             </td>
                             <td
@@ -1579,7 +1580,7 @@ export default function App() {
                                 : "Reverted"}
                             </td>
                             <td>
-                              {tx.status === "APPROVED" ? (
+                              {(tx.status === "APPROVED" || tx.status === "SETTLED") ? (
                                 <a
                                   href={`https://holesky.etherscan.io/tx/mock_${tx.request_id}`}
                                   target="_blank"

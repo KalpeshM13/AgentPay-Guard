@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://localhost:8000/api/v1";
 
 export async function getAgent(id) {
   const response = await fetch(`${API_BASE_URL}/agents/${id}`);

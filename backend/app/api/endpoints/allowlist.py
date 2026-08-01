@@ -42,12 +42,12 @@ router = APIRouter(tags=["allowlist"])
     responses={404: {"description": "Agent not found."}},
 )
 async def list_entries(
-    agent_id: int,
+    agent_id: str,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AllowlistResponse:
     """List allowlist entries for an agent."""
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -85,14 +85,14 @@ async def list_entries(
     },
 )
 async def add_entry(
-    agent_id: int,
+    agent_id: str,
     body: AllowlistAdd,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> AllowlistEntryResponse:
     """Add a merchant to an agent's allowlist."""
     # Validate agent exists
-    agent = await agent_service.get_agent_by_id(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -103,8 +103,9 @@ async def add_entry(
 
     # Check it's not already on the list
     existing = await allowlist_service.get_allowlist_entry(
-        session, agent_id, body.merchant_id,
+        session, agent.id, body.merchant_id,
     )
+
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -136,13 +137,18 @@ async def add_entry(
     },
 )
 async def remove_entry(
-    agent_id: int,
+    agent_id: str,
     merchant_id: int,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Remove a merchant from an agent's allowlist."""
-    entry = await allowlist_service.get_allowlist_entry(session, agent_id, merchant_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
+        
+    entry = await allowlist_service.get_allowlist_entry(session, agent.id, merchant_id)
+
     if entry is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
