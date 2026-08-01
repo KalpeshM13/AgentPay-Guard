@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python virtual environments
 .venv/
 venv/
@@ -43,3 +44,16 @@ frontend/.env.production.local
 # OS files
 .DS_Store
 Thumbs.db
+=======
+# v0 runtime files (should only exist in preview, not in git)
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+
+# Common ignores
+node_modules/
+.next/
+.env*.local
+.DS_Store
+.vercel
+>>>>>>> 34705a2 (Update frontend with AgentPay Guard branding)
