@@ -34,15 +34,30 @@ async def execute(
     merchant_id: int,
     amount: float,
 ) -> Transaction:
-    """Execute an already-approved payment and update balance in Firestore."""
+    """Execute an already-approved payment via Smart Contract and update Firestore."""
     if amount <= 0:
         raise ValueError(f"amount must be positive, got {amount}")
-    if amount > agent.balance:
-        raise ValueError(
-            f"Insufficient balance: need {amount}, have {agent.balance}"
-        )
 
     balance_before = agent.balance
+
+    # Convert ETH to Wei
+    from app.services.chain import execute_payment
+    amount_wei = int(amount * 10**18)
+    
+    # For MVP: hardcode merchant address to a dummy address (Account #1)
+    # and the agent's private key (Account #2).
+    merchant_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" 
+    agent_private_key = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a" 
+
+    # Execute on blockchain
+    try:
+        tx_hash = execute_payment(merchant_address, amount_wei, b"", agent_private_key)
+        logger.info(f"Blockchain execution successful. TxHash: {tx_hash}")
+    except Exception as e:
+        logger.error(f"Blockchain execution failed: {e}")
+        raise ValueError(f"Smart Contract reverted: {e}")
+
+    # Deduct off-chain simulated balance as well
     agent.balance -= amount
 
     # Get auto-incrementing integer IDs atomically
@@ -83,6 +98,7 @@ async def execute(
             "amount": amount,
             "balance_before": balance_before,
             "balance_after": agent.balance,
+            "tx_hash": tx_hash,
         }),
         timestamp=datetime.now(timezone.utc),
     )
@@ -95,10 +111,10 @@ async def execute(
 
     logger.info(
         "Payment SETTLED: agent=%d merchant=%d amount=%.2f "
-        "balance %.2f → %.2f request=%s tx_id=%d",
+        "balance %.2f → %.2f request=%s tx_id=%d onchain_hash=%s",
         agent.id, merchant_id, amount,
         balance_before, agent.balance,
-        request_id, transaction.id,
+        request_id, transaction.id, tx_hash
     )
 
     return transaction

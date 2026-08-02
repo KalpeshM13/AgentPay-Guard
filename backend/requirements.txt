@@ -24,6 +24,7 @@ firebase-admin>=6.5.0,<7.0               # Firebase Auth & Firestore
 python-multipart>=0.0.9      # OAuth2 form-data parsing (POST /auth/login)
 
 # -- Testing (optional — omit from Render free tier) ---------------------------
+# -- Testing (optional — omit from Render free tier) ---------------------------
 # pytest>=8.3.0,<9.0
 # pytest-asyncio>=0.24.0,<1.0
 # httpx>=0.27.0,<1.0

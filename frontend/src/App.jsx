@@ -23,6 +23,7 @@ import {
   Moon,
 } from "lucide-react";
 import * as api from "./api";
+import * as web3 from "./web3";
 
 const DEFAULT_AGENT_ID = 1;
 
@@ -87,7 +88,7 @@ export default function App() {
     } catch (err) {
       console.error(err);
       setError(
-        "Could not connect to FastAPI Backend. Make sure it is running on port 8000.",
+        "Could not connect to FastAPI Backend. Make sure it is running on port 8080.",
       );
     } finally {
       setLoading(false);
@@ -167,6 +168,7 @@ export default function App() {
       async () => {
         if (isFreezing) {
           addLog("warn", "OWNER ACTION: Initiated Emergency Freeze on-chain.");
+          await web3.freezeWallet();
           await api.freezeAgent(DEFAULT_AGENT_ID);
           addLog(
             "error",
@@ -174,6 +176,7 @@ export default function App() {
           );
         } else {
           addLog("info", "OWNER ACTION: Initiated Wallet Unfreeze on-chain.");
+          await web3.unfreezeWallet();
           await api.unfreezeAgent(DEFAULT_AGENT_ID);
           addLog("success", "SYSTEM: Wallet status restored to ACTIVE.");
         }
@@ -197,6 +200,7 @@ export default function App() {
           "info",
           `OWNER ACTION: Updating limits (Per Tx: ${limitPerTx} ETH, Daily: ${limitDaily} ETH)`,
         );
+        await web3.updateLimits(limitPerTx, limitDaily);
         await api.updatePolicy(DEFAULT_AGENT_ID, limitPerTx, limitDaily);
         addLog(
           "success",
@@ -236,6 +240,7 @@ export default function App() {
           "info",
           `OWNER ACTION: Allowlisting merchant "${mName}" (${mId})`,
         );
+        await web3.allowlistTarget(mAddress, true);
         await api.addToAllowlist(DEFAULT_AGENT_ID, mId, mName, mAddress);
         addLog("success", `SYSTEM: Merchant "${mName}" allowlisted on-chain.`);
         setNewMerchantId("");
@@ -260,6 +265,8 @@ export default function App() {
           "warn",
           `OWNER ACTION: Revoking allowlist authorization for "${displayName || merchantId}"`,
         );
+        // Using a dummy address here to revoke since we don't store actual chain address in state for this MVP list
+        await web3.allowlistTarget("0x70997970C51812dc3A010C7d01b50e0d17dc79C8", false);
         await api.removeFromAllowlist(DEFAULT_AGENT_ID, merchantId);
         addLog(
           "success",

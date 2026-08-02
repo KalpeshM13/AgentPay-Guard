@@ -1,0 +1,41 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "C:\\Users\\VIDYANKSHINI\\Desktop\\project\\AgentPay_Guard\\AgentPay-Guard\\contracts\\contracts\\AgentGuardWallet.sol": {
+      "lastModificationDate": 1785648573766,
+      "contentHash": "69c86f58244519726c949ad8498db80c",
+      "sourceName": "contracts/AgentGuardWallet.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "AgentGuardWallet"
+      ]
+    }
+  }
+}
