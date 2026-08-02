@@ -29,10 +29,13 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 async def populate_agent_limits(session, agent) -> None:
     from app.services.payment_executor import get_daily_spend
+    from app.services.agent_service import _load_agent_relations
     spent_today = await get_daily_spend(session, agent.id)
     agent.spent_today = spent_today
     agent.remaining_daily_limit = max(0.0, agent.daily_limit - spent_today)
     agent.per_tx_limit = agent.per_transaction_limit
+    if not hasattr(agent, "allowlist") or agent.allowlist is None:
+        await _load_agent_relations(session, agent)
 
 
 # =============================================================================

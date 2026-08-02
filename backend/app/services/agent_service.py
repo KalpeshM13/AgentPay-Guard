@@ -24,15 +24,19 @@ async def _load_agent_relations(session: any, agent: Agent) -> None:
     """Fetch and attach allowlist entries and merchants for an agent."""
     entries_data = await session.query("agent_allowlist", [("agent_id", "==", agent.id)])
     allowlist_entries = []
+    merchants_list = []
     for ed in entries_data:
         entry = AgentMerchant(**ed)
         m_data = await session.get("merchants", entry.merchant_id)
         if m_data:
-            entry.merchant = Merchant(**m_data)
+            m_obj = Merchant(**m_data)
+            entry.merchant = m_obj
+            merchants_list.append(m_obj)
         else:
             entry.merchant = None
         allowlist_entries.append(entry)
     agent.allowlist_entries = allowlist_entries
+    agent.allowlist = merchants_list
 
 
 # =============================================================================
