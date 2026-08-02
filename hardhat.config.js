@@ -11,14 +11,18 @@ function loadEnv() {
       if (match) {
         const key = match[1];
         const value = match[2];
-        if (!process.env[key]) {
-          process.env[key] = value;
-        }
+        // Allow later entries to overwrite earlier entries in .env
+        process.env[key] = value;
       }
     });
   }
 }
 loadEnv();
+
+let privateKey = process.env.AGENT_PRIVATE_KEY || "";
+if (privateKey && !privateKey.startsWith("0x")) {
+  privateKey = "0x" + privateKey;
+}
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -29,7 +33,7 @@ module.exports = {
     },
     sepolia: {
       url: process.env.RPC_PROVIDER_URL || "",
-      accounts: process.env.AGENT_PRIVATE_KEY ? [process.env.AGENT_PRIVATE_KEY] : [],
+      accounts: privateKey ? [privateKey] : [],
     },
   },
 };

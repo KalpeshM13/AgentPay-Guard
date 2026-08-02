@@ -113,6 +113,17 @@ export default function App() {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
     const addressToUse = agent?.smart_contract_address || CONTRACT_ADDRESS;
+
+    if (!addressToUse || !ethers.isAddress(addressToUse)) {
+      throw new Error("No valid smart contract address is configured.");
+    }
+
+    // Verify if bytecode exists at address on the current network
+    const code = await provider.getCode(addressToUse);
+    if (!code || code === "0x" || code === "0x0") {
+      throw new Error(`No smart contract bytecode deployed at ${addressToUse.substring(0, 8)}... on this network.`);
+    }
+
     return new ethers.Contract(addressToUse, WALLET_ABI, signer);
   };
 
@@ -235,7 +246,9 @@ export default function App() {
       const elapsedTime = Date.now() - startTime;
       const minDuration = 1000;
       if (elapsedTime < minDuration) {
-        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsedTime));
+        await new Promise((resolve) =>
+          setTimeout(resolve, minDuration - elapsedTime),
+        );
       }
       setIsRefreshing(false);
     }
@@ -404,16 +417,20 @@ export default function App() {
             `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`,
           );
           await tx.wait();
-
-          await api.updatePolicy(selectedAgentId, limitPerTx, limitDaily);
+        } catch (chainErr) {
+          console.warn("On-chain policy update warning:", chainErr);
           addLog(
-            "success",
-            "SYSTEM: Spending limit policies updated successfully.",
+            "warn",
+            `ON-CHAIN TX SKIPPED (${chainErr.reason || "Network Mismatch"}): Applying server policy limits...`,
           );
-          setShowLimitsModal(false);
-        } catch (err) {
-          throw new Error(err.reason || err.message);
         }
+
+        await api.updatePolicy(selectedAgentId, limitPerTx, limitDaily);
+        addLog(
+          "success",
+          "SYSTEM: Spending limit policies updated successfully.",
+        );
+        setShowLimitsModal(false);
       },
     );
   };
@@ -465,18 +482,22 @@ export default function App() {
             `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`,
           );
           await tx.wait();
-
-          await api.addToAllowlist(selectedAgentId, mId, mName, mAddress);
+        } catch (chainErr) {
+          console.warn("On-chain allowlist warning:", chainErr);
           addLog(
-            "success",
-            `SYSTEM: Merchant "${mName}" allowlisted on-chain.`,
+            "warn",
+            `ON-CHAIN TX SKIPPED (${chainErr.reason || "Network Mismatch"}): Allowlisting on server policy engine...`,
           );
-          setNewMerchantId("");
-          setNewMerchantName("");
-          setNewMerchantAddress("");
-        } catch (err) {
-          throw new Error(err.reason || err.message);
         }
+
+        await api.addToAllowlist(selectedAgentId, mId, mName, mAddress);
+        addLog(
+          "success",
+          `SYSTEM: Merchant "${mName}" allowlisted successfully.`,
+        );
+        setNewMerchantId("");
+        setNewMerchantName("");
+        setNewMerchantAddress("");
       },
     );
   };
@@ -1059,7 +1080,11 @@ export default function App() {
                   disabled={isRefreshing}
                   title="Refresh details"
                 >
-                  <RefreshCw size={14} className={isRefreshing ? "spin-anim" : ""} /> Refresh
+                  <RefreshCw
+                    size={14}
+                    className={isRefreshing ? "spin-anim" : ""}
+                  />{" "}
+                  Refresh
                 </button>
               </div>
 
@@ -2057,7 +2082,11 @@ export default function App() {
                   onClick={handleRefreshAll}
                   disabled={isRefreshing}
                 >
-                  <RefreshCw size={14} className={isRefreshing ? "spin-anim" : ""} /> Refresh
+                  <RefreshCw
+                    size={14}
+                    className={isRefreshing ? "spin-anim" : ""}
+                  />{" "}
+                  Refresh
                 </button>
               </div>
 
