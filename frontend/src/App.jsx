@@ -25,7 +25,9 @@ import {
 import * as api from "./api";
 import { ethers } from "ethers";
 
-const CONTRACT_ADDRESS = import.meta.env.VITE_SMART_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const CONTRACT_ADDRESS =
+  import.meta.env.VITE_SMART_CONTRACT_ADDRESS ||
+  "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 const WALLET_ABI = [
   "function freeze() external",
@@ -36,7 +38,7 @@ const WALLET_ABI = [
   "function perTxLimit() external view returns (uint256)",
   "function periodLimit() external view returns (uint256)",
   "function spentThisPeriod() external view returns (uint256)",
-  "function allowedTargets(address) external view returns (bool)"
+  "function allowedTargets(address) external view returns (bool)",
 ];
 
 export default function App() {
@@ -65,7 +67,7 @@ export default function App() {
   const [walletBalance, setWalletBalance] = useState("0");
 
   const checkConnection = async () => {
-    if (window.ethereum) {
+    if (window.ethereum && localStorage.getItem("walletAddress")) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const accounts = await provider.listAccounts();
@@ -84,7 +86,9 @@ export default function App() {
 
   const connectWallet = async () => {
     if (!window.ethereum) {
-      alert("MetaMask is not installed. Please install it to use on-chain features.");
+      alert(
+        "MetaMask is not installed. Please install it to use on-chain features.",
+      );
       return;
     }
     try {
@@ -93,7 +97,7 @@ export default function App() {
       const address = accounts[0];
       setWalletAddress(address);
       localStorage.setItem("walletAddress", address);
-      
+
       const balance = await provider.getBalance(address);
       setWalletBalance(ethers.formatEther(balance));
       addLog("info", `METAMASK: Connected account ${address}`);
@@ -163,8 +167,8 @@ export default function App() {
       setSelectedAgentId("1");
     }
 
-    // Prompt MetaMask connection if not already connected
-    if (window.ethereum) {
+    // Prompt MetaMask connection if not already connected (and was previously connected)
+    if (window.ethereum && localStorage.getItem("walletAddress")) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const accounts = await provider.listAccounts();
@@ -215,6 +219,13 @@ export default function App() {
     }
   };
 
+  const handleRefreshAll = async () => {
+    setLoading(true);
+    await loadUserProfileAndAgents();
+    await checkConnection();
+    await fetchData();
+  };
+
   useEffect(() => {
     loadUserProfileAndAgents();
     checkConnection();
@@ -222,7 +233,7 @@ export default function App() {
     // Listen to account changes dynamically
     if (window.ethereum) {
       const handleAccounts = async (accounts) => {
-        if (accounts.length > 0) {
+        if (accounts.length > 0 && localStorage.getItem("walletAddress")) {
           setWalletAddress(accounts[0]);
           localStorage.setItem("walletAddress", accounts[0]);
           const provider = new ethers.BrowserProvider(window.ethereum);
@@ -274,7 +285,12 @@ export default function App() {
   };
 
   // Metamask Simulation triggers
-  const triggerOnChainTx = async (actionType, title, details, executionCallback) => {
+  const triggerOnChainTx = async (
+    actionType,
+    title,
+    details,
+    executionCallback,
+  ) => {
     setSigningTx({
       action: actionType,
       title: title,
@@ -306,17 +322,28 @@ export default function App() {
       isFreezing ? "freeze" : "unfreeze",
       isFreezing ? "Emergency Freeze contract" : "Unfreeze contract",
       {
-        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(
+          0,
+          6,
+        )}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: isFreezing ? "freeze()" : "unfreeze()",
         "Gas Limit": "45,000 gas",
         Value: "0 ETH",
       },
       async () => {
         try {
-          addLog("info", `OWNER ACTION: Sending transaction on-chain via MetaMask...`);
+          addLog(
+            "info",
+            `OWNER ACTION: Sending transaction on-chain via MetaMask...`,
+          );
           const contract = await getContractInstance();
-          const tx = isFreezing ? await contract.freeze() : await contract.unfreeze();
-          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          const tx = isFreezing
+            ? await contract.freeze()
+            : await contract.unfreeze();
+          addLog(
+            "info",
+            `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`,
+          );
           await tx.wait();
 
           if (isFreezing) {
@@ -342,7 +369,10 @@ export default function App() {
       "policy",
       "Set Wallet Limits",
       {
-        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(
+          0,
+          6,
+        )}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: "setLimits(uint256, uint256)",
         "Per-Tx Limit": `${limitPerTx} ETH`,
         "Daily Limit": `${limitDaily} ETH`,
@@ -354,7 +384,10 @@ export default function App() {
           const perTxWei = ethers.parseEther(limitPerTx);
           const dailyWei = ethers.parseEther(limitDaily);
           const tx = await contract.setLimits(perTxWei, dailyWei);
-          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          addLog(
+            "info",
+            `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`,
+          );
           await tx.wait();
 
           await api.updatePolicy(selectedAgentId, limitPerTx, limitDaily);
@@ -385,7 +418,9 @@ export default function App() {
         .padStart(40, "0")}`;
 
     if (!ethers.isAddress(mAddress)) {
-      alert("Invalid Ethereum Address! The Destination Address Reference must be a valid Ethereum address starting with 0x (e.g., 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266).");
+      alert(
+        "Invalid Ethereum Address! The Destination Address Reference must be a valid Ethereum address starting with 0x (e.g., 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266).",
+      );
       return;
     }
 
@@ -393,7 +428,10 @@ export default function App() {
       "allowlist_add",
       "Add Approved Target",
       {
-        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(
+          0,
+          6,
+        )}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: "setAllowedTarget(address, bool)",
         "Merchant ID": mId,
         "Merchant Name": mName,
@@ -401,14 +439,23 @@ export default function App() {
       },
       async () => {
         try {
-          addLog("info", `OWNER ACTION: Allowlisting merchant address "${mAddress}" on-chain...`);
+          addLog(
+            "info",
+            `OWNER ACTION: Allowlisting merchant address "${mAddress}" on-chain...`,
+          );
           const contract = await getContractInstance();
           const tx = await contract.setAllowedTarget(mAddress, true);
-          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          addLog(
+            "info",
+            `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`,
+          );
           await tx.wait();
 
           await api.addToAllowlist(selectedAgentId, mId, mName, mAddress);
-          addLog("success", `SYSTEM: Merchant "${mName}" allowlisted on-chain.`);
+          addLog(
+            "success",
+            `SYSTEM: Merchant "${mName}" allowlisted on-chain.`,
+          );
           setNewMerchantId("");
           setNewMerchantName("");
           setNewMerchantAddress("");
@@ -420,11 +467,16 @@ export default function App() {
   };
 
   const handleRemoveFromAllowlist = (merchantId, displayName) => {
-    const entry = agent?.allowlist?.find(m => m.merchant_id === merchantId || m.id === merchantId);
+    const entry = agent?.allowlist?.find(
+      (m) => m.merchant_id === merchantId || m.id === merchantId,
+    );
     const mAddress = entry ? entry.destination_reference : null;
 
     if (!mAddress) {
-      addLog("error", `ERROR: Could not find address for merchant ID: ${merchantId}`);
+      addLog(
+        "error",
+        `ERROR: Could not find address for merchant ID: ${merchantId}`,
+      );
       return;
     }
 
@@ -432,17 +484,28 @@ export default function App() {
       "allowlist_remove",
       "Revoke Approved Target",
       {
-        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(
+          0,
+          6,
+        )}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: "setAllowedTarget(address, bool)",
         "Merchant ID": merchantId,
         Status: "FALSE (Revoke)",
       },
       async () => {
         try {
-          addLog("warn", `OWNER ACTION: Revoking allowlist authorization for "${displayName || merchantId}" on-chain...`);
+          addLog(
+            "warn",
+            `OWNER ACTION: Revoking allowlist authorization for "${
+              displayName || merchantId
+            }" on-chain...`,
+          );
           const contract = await getContractInstance();
           const tx = await contract.setAllowedTarget(mAddress, false);
-          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          addLog(
+            "info",
+            `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`,
+          );
           await tx.wait();
 
           await api.removeFromAllowlist(selectedAgentId, merchantId);
@@ -474,7 +537,9 @@ export default function App() {
       );
       addLog(
         "success",
-        `CONTRACT CONFIRMED: Payment of ${amount} ETH processed successfully. Remaining daily: ${response.remaining_daily_limit.toFixed(4)} ETH`,
+        `CONTRACT CONFIRMED: Payment of ${amount} ETH processed successfully. Remaining daily: ${response.remaining_daily_limit.toFixed(
+          4,
+        )} ETH`,
       );
       await fetchData();
     } catch (err) {
@@ -537,52 +602,73 @@ export default function App() {
           textAlign: "center",
           padding: "2rem",
           position: "relative",
-          overflow: "hidden"
+          overflow: "hidden",
         }}
       >
         {/* Glowing background shapes */}
-        <div style={{
-          position: "absolute",
-          top: "10%",
-          left: "20%",
-          width: "300px",
-          height: "300px",
-          backgroundColor: "rgba(99, 102, 241, 0.15)",
-          borderRadius: "50%",
-          filter: "blur(80px)",
-          zIndex: 0
-        }} />
-        <div style={{
-          position: "absolute",
-          bottom: "10%",
-          right: "20%",
-          width: "300px",
-          height: "300px",
-          backgroundColor: "rgba(244, 63, 94, 0.1)",
-          borderRadius: "50%",
-          filter: "blur(80px)",
-          zIndex: 0
-        }} />
+        <div
+          style={{
+            position: "absolute",
+            top: "10%",
+            left: "20%",
+            width: "300px",
+            height: "300px",
+            backgroundColor: "rgba(99, 102, 241, 0.15)",
+            borderRadius: "50%",
+            filter: "blur(80px)",
+            zIndex: 0,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: "10%",
+            right: "20%",
+            width: "300px",
+            height: "300px",
+            backgroundColor: "rgba(244, 63, 94, 0.1)",
+            borderRadius: "50%",
+            filter: "blur(80px)",
+            zIndex: 0,
+          }}
+        />
 
         <div style={{ zIndex: 1, maxWidth: "450px" }}>
           {/* Orange Fox Glow / Shield icon */}
-          <div style={{ 
-            display: "inline-flex", 
-            padding: "1.25rem", 
-            borderRadius: "24px", 
-            backgroundColor: "rgba(249, 115, 22, 0.1)", 
-            border: "1px solid rgba(249, 115, 22, 0.2)",
-            marginBottom: "1.5rem",
-            boxShadow: "0 0 30px rgba(249, 115, 22, 0.1)"
-          }}>
+          <div
+            style={{
+              display: "inline-flex",
+              padding: "1.25rem",
+              borderRadius: "24px",
+              backgroundColor: "rgba(249, 115, 22, 0.1)",
+              border: "1px solid rgba(249, 115, 22, 0.2)",
+              marginBottom: "1.5rem",
+              boxShadow: "0 0 30px rgba(249, 115, 22, 0.1)",
+            }}
+          >
             <Shield size={64} style={{ color: "#f97316" }} />
           </div>
 
-          <h1 style={{ fontSize: "2.2rem", fontWeight: "800", marginBottom: "0.5rem", letterSpacing: "-0.5px" }}>
+          <h1
+            style={{
+              fontSize: "2.2rem",
+              fontWeight: "800",
+              marginBottom: "0.5rem",
+              letterSpacing: "-0.5px",
+            }}
+          >
             AGENTPAY GUARD
           </h1>
-          <p style={{ color: "#9ca3af", fontSize: "0.95rem", marginBottom: "2rem", lineHeight: "1.5" }}>
-            Secure AI agent spending with on-chain control policies. Connect your MetaMask owner wallet to authorize and monitor transactions.
+          <p
+            style={{
+              color: "#9ca3af",
+              fontSize: "0.95rem",
+              marginBottom: "2rem",
+              lineHeight: "1.5",
+            }}
+          >
+            Secure AI agent spending with on-chain control policies. Connect
+            your MetaMask owner wallet to authorize and monitor transactions.
           </p>
 
           <button
@@ -597,7 +683,7 @@ export default function App() {
               fontWeight: "600",
               cursor: "pointer",
               boxShadow: "0 4px 14px rgba(249, 115, 22, 0.4)",
-              transition: "transform 0.2s, background-color 0.2s"
+              transition: "transform 0.2s, background-color 0.2s",
             }}
             onMouseOver={(e) => {
               e.target.style.backgroundColor = "#ea580c";
@@ -692,14 +778,14 @@ export default function App() {
             </div>
           </div>
 
-
-
           <nav
             className="sidebar-menu"
             style={{ flexGrow: 1, overflowY: "auto" }}
           >
             <button
-              className={`sidebar-menu-item ${activeScreen === "dashboard" ? "active" : ""}`}
+              className={`sidebar-menu-item ${
+                activeScreen === "dashboard" ? "active" : ""
+              }`}
               onClick={() => {
                 setActiveScreen("dashboard");
                 setMobileMenuOpen(false);
@@ -709,7 +795,9 @@ export default function App() {
             </button>
 
             <button
-              className={`sidebar-menu-item ${activeScreen === "allowlist" ? "active" : ""}`}
+              className={`sidebar-menu-item ${
+                activeScreen === "allowlist" ? "active" : ""
+              }`}
               onClick={() => {
                 setActiveScreen("allowlist");
                 setMobileMenuOpen(false);
@@ -719,7 +807,13 @@ export default function App() {
             </button>
 
             <button
-              className={`sidebar-menu-item ${activeScreen === "killswitch" ? (agent?.status === "ACTIVE" ? "active" : "active-frozen") : ""}`}
+              className={`sidebar-menu-item ${
+                activeScreen === "killswitch"
+                  ? agent?.status === "ACTIVE"
+                    ? "active"
+                    : "active-frozen"
+                  : ""
+              }`}
               onClick={() => {
                 setActiveScreen("killswitch");
                 setMobileMenuOpen(false);
@@ -729,7 +823,9 @@ export default function App() {
             </button>
 
             <button
-              className={`sidebar-menu-item ${activeScreen === "console" ? "active" : ""}`}
+              className={`sidebar-menu-item ${
+                activeScreen === "console" ? "active" : ""
+              }`}
               onClick={() => {
                 setActiveScreen("console");
                 setMobileMenuOpen(false);
@@ -739,7 +835,9 @@ export default function App() {
             </button>
 
             <button
-              className={`sidebar-menu-item ${activeScreen === "explorer" ? "active" : ""}`}
+              className={`sidebar-menu-item ${
+                activeScreen === "explorer" ? "active" : ""
+              }`}
               onClick={() => {
                 setActiveScreen("explorer");
                 setMobileMenuOpen(false);
@@ -793,23 +891,43 @@ export default function App() {
                   gap: "0.5rem",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    width: "100%",
+                  }}
+                >
                   <span style={{ color: "var(--text-secondary)" }}>
                     Wallet:
                   </span>
                   <span
-                    style={{ fontWeight: "600", color: "var(--accent-primary)", fontFamily: "monospace" }}
+                    style={{
+                      fontWeight: "600",
+                      color: "var(--accent-primary)",
+                      fontFamily: "monospace",
+                    }}
                     title={walletAddress}
                   >
-                    {walletAddress.substring(0, 6)}...{walletAddress.substring(walletAddress.length - 4)}
+                    {walletAddress.substring(0, 6)}...
+                    {walletAddress.substring(walletAddress.length - 4)}
                   </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    width: "100%",
+                  }}
+                >
                   <span style={{ color: "var(--text-secondary)" }}>
                     Balance:
                   </span>
                   <span
-                    style={{ fontWeight: "600", color: "var(--accent-primary)" }}
+                    style={{
+                      fontWeight: "600",
+                      color: "var(--accent-primary)",
+                    }}
                   >
                     {parseFloat(walletBalance).toFixed(4)} ETH
                   </span>
@@ -854,10 +972,22 @@ export default function App() {
             </div>
             <div className="top-bar-right">
               <div
-                className={`wallet-status-chip ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}
+                className={`wallet-status-chip ${
+                  agent
+                    ? agent.status === "ACTIVE"
+                      ? "active"
+                      : "frozen"
+                    : "offline"
+                }`}
               >
                 <span
-                  className={`status-dot ${agent ? (agent.status === "ACTIVE" ? "active" : "frozen") : "offline"}`}
+                  className={`status-dot ${
+                    agent
+                      ? agent.status === "ACTIVE"
+                        ? "active"
+                        : "frozen"
+                      : "offline"
+                  }`}
                 ></span>
                 <span>
                   Wallet Status:{" "}
@@ -910,7 +1040,7 @@ export default function App() {
                 </div>
                 <button
                   className="btn btn-secondary"
-                  onClick={fetchData}
+                  onClick={handleRefreshAll}
                   title="Refresh details"
                 >
                   <RefreshCw size={14} /> Refresh
@@ -967,7 +1097,9 @@ export default function App() {
                     }}
                   >
                     {agent
-                      ? `${agent.spent_today.toFixed(4)} / ${agent.remaining_daily_limit.toFixed(4)} ETH`
+                      ? `${agent.spent_today.toFixed(
+                          4,
+                        )} / ${agent.remaining_daily_limit.toFixed(4)} ETH`
                       : "N/A"}
                   </div>
                 </div>
@@ -1008,7 +1140,10 @@ export default function App() {
                         >
                           Smart Wallet Contract
                         </span>
-                        <span className="info-value" style={{ fontFamily: "monospace" }}>
+                        <span
+                          className="info-value"
+                          style={{ fontFamily: "monospace" }}
+                        >
                           {CONTRACT_ADDRESS}
                         </span>
                       </div>
@@ -1021,8 +1156,12 @@ export default function App() {
                         >
                           Owner Wallet Address
                         </span>
-                        <span className="info-value" style={{ fontFamily: "monospace" }}>
-                          {walletAddress || "Not Connected (Click Connect MetaMask in sidebar)"}
+                        <span
+                          className="info-value"
+                          style={{ fontFamily: "monospace" }}
+                        >
+                          {walletAddress ||
+                            "Not Connected (Click Connect MetaMask in sidebar)"}
                         </span>
                       </div>
                       <div className="info-row">
@@ -1034,7 +1173,10 @@ export default function App() {
                         >
                           Authorized Agent Key
                         </span>
-                        <span className="info-value" style={{ fontFamily: "monospace" }}>
+                        <span
+                          className="info-value"
+                          style={{ fontFamily: "monospace" }}
+                        >
                           0x70997970C51812dc3A010C7d01b50e0d17dc79C8
                         </span>
                       </div>
@@ -1171,7 +1313,12 @@ export default function App() {
                                 </td>
                                 <td>
                                   <span
-                                    className={`tx-badge ${tx.status === "APPROVED" || tx.status === "SETTLED" ? "approved" : "blocked"}`}
+                                    className={`tx-badge ${
+                                      tx.status === "APPROVED" ||
+                                      tx.status === "SETTLED"
+                                        ? "approved"
+                                        : "blocked"
+                                    }`}
                                   >
                                     {tx.status === "APPROVED" ||
                                     tx.status === "SETTLED"
@@ -1889,7 +2036,10 @@ export default function App() {
                     events.
                   </p>
                 </div>
-                <button className="btn btn-secondary" onClick={fetchData}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleRefreshAll}
+                >
                   <RefreshCw size={14} /> Refresh
                 </button>
               </div>
@@ -1946,7 +2096,12 @@ export default function App() {
                             </td>
                             <td>
                               <span
-                                className={`tx-badge ${tx.status === "APPROVED" || tx.status === "SETTLED" ? "approved" : "blocked"}`}
+                                className={`tx-badge ${
+                                  tx.status === "APPROVED" ||
+                                  tx.status === "SETTLED"
+                                    ? "approved"
+                                    : "blocked"
+                                }`}
                               >
                                 {tx.status === "APPROVED" ||
                                 tx.status === "SETTLED"
@@ -2085,8 +2240,36 @@ export default function App() {
 
         {/* --- METAMASK TRANSACTION SIGNATURE SIMULATOR --- */}
         {signingTx && (
-          <div className="metamask-simulator-overlay" style={{ display: "flex", justifyContent: "center", alignItems: "center", position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2.5rem", borderRadius: "16px", backgroundColor: "#12131a", border: "1px solid var(--border-color)", maxWidth: "400px", width: "90%", gap: "1.5rem" }}>
+          <div
+            className="metamask-simulator-overlay"
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(0,0,0,0.75)",
+              zIndex: 9999,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "2.5rem",
+                borderRadius: "16px",
+                backgroundColor: "#12131a",
+                border: "1px solid var(--border-color)",
+                maxWidth: "400px",
+                width: "90%",
+                gap: "1.5rem",
+              }}
+            >
               {signingProgress === "broadcasting" && (
                 <>
                   <RefreshCw
@@ -2097,11 +2280,24 @@ export default function App() {
                     }}
                   />
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ color: "#ffffff", fontWeight: "bold", fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+                    <div
+                      style={{
+                        color: "#ffffff",
+                        fontWeight: "bold",
+                        fontSize: "1.1rem",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
                       MetaMask Request
                     </div>
-                    <div style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                      Please confirm the transaction in your MetaMask wallet extension.
+                    <div
+                      style={{
+                        color: "var(--text-secondary)",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      Please confirm the transaction in your MetaMask wallet
+                      extension.
                     </div>
                   </div>
                 </>
@@ -2124,10 +2320,22 @@ export default function App() {
                     <Check size={32} />
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ color: "#ffffff", fontWeight: "bold", fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+                    <div
+                      style={{
+                        color: "#ffffff",
+                        fontWeight: "bold",
+                        fontSize: "1.1rem",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
                       Transaction Confirmed
                     </div>
-                    <div style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                    <div
+                      style={{
+                        color: "var(--text-secondary)",
+                        fontSize: "0.9rem",
+                      }}
+                    >
                       On-chain parameters successfully updated.
                     </div>
                   </div>
