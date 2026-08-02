@@ -256,17 +256,14 @@ class MerchantListResponse(BaseModel):
 # =============================================================================
 
 class AllowlistAdd(BaseModel):
-    """Body for ``POST /agents/{id}/allowlist``.
-
-    Example:
-        { "merchant_id": 1 }
-    """
-    merchant_id: int = Field(
+    """Body for ``POST /agents/{id}/allowlist``."""
+    merchant_id: int | str = Field(
         ...,
-        gt=0,
-        examples=[1],
-        description="ID of an existing merchant to add to this agent's allowlist.",
+        examples=[1, "merchant_aws_01"],
+        description="ID or reference of merchant to add to allowlist.",
     )
+    display_name: str | None = Field(default=None, examples=["Amazon Web Services"])
+    destination_reference: str | None = Field(default=None, examples=["0x91CA..."])
 
 
 class AllowlistEntryResponse(BaseModel):

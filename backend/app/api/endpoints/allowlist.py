@@ -96,14 +96,34 @@ async def add_entry(
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
-    # Validate merchant exists
-    merchant = await merchant_service.get_merchant_by_id(session, body.merchant_id)
+    # Validate merchant exists or resolve by string/auto-create
+    merchant = None
+    if isinstance(body.merchant_id, int) or (isinstance(body.merchant_id, str) and body.merchant_id.isdigit()):
+        merchant = await merchant_service.get_merchant_by_id(session, int(body.merchant_id))
+
+    if merchant is None and isinstance(body.merchant_id, str):
+        merchant = await merchant_service.get_merchant_by_name(session, body.merchant_id)
+        if merchant is None:
+            merchants = await session.query("merchants", [("destination_reference", "==", body.merchant_id)])
+            if merchants:
+                from app.models.merchant import Merchant
+                merchant = Merchant(**merchants[0])
+
+        if merchant is None:
+            display_name = body.display_name or body.merchant_id
+            dest_ref = body.destination_reference or body.merchant_id
+            merchant = await merchant_service.create_merchant(
+                session,
+                display_name=display_name,
+                destination_reference=dest_ref,
+            )
+
     if merchant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Merchant not found.")
 
     # Check it's not already on the list
     existing = await allowlist_service.get_allowlist_entry(
-        session, agent.id, body.merchant_id,
+        session, agent.id, merchant.id,
     )
 
     if existing is not None:

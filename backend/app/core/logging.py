@@ -45,6 +45,12 @@ def setup_logging() -> None:
     for handler in root.handlers[:]:
         root.removeHandler(handler)
 
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(settings.LOG_LEVEL)
 

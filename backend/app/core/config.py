@@ -131,10 +131,10 @@ def validate_production_settings() -> None:
         )
 
     for w in warnings:
-        logger.warning("⚠️  %s", w)
+        logger.warning("[WARNING] %s", w)
 
     if warnings:
         logger.warning(
-            "👉  Set environment variables via your hosting dashboard "
+            "[INFO] Set environment variables via your hosting dashboard "
             "(Render, Railway, etc.) or in the .env file."
         )
