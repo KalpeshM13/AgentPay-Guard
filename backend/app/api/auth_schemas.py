@@ -118,6 +118,7 @@ class UserResponse(BaseModel):
     display_name: str
     role: UserRole
     is_active: bool
+    balance: float
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -61,7 +61,7 @@ async def create(
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Create an agent."""
-    existing = await agent_service.get_agent_by_name(session, body.name)
+    existing = await agent_service.get_agent_by_name(session, body.name, user_id=user.id)
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -75,6 +75,7 @@ async def create(
         per_transaction_limit=body.per_transaction_limit,
         daily_limit=body.daily_limit,
         max_requests_per_minute=body.max_requests_per_minute,
+        user_id=user.id,
     )
     await populate_agent_limits(session, agent)
     return AgentResponse.model_validate(agent)
@@ -116,7 +117,7 @@ async def list_all(
             )
 
     agents, total = await agent_service.list_agents(
-        session, status=status_enum, skip=skip, limit=limit,
+        session, status=status_enum, skip=skip, limit=limit, user_id=user.id,
     )
     for a in agents:
         await populate_agent_limits(session, a)
@@ -142,7 +143,7 @@ async def get_one(
     user: User = Depends(get_current_user),
 ) -> AgentResponse:
     """Get agent by ID or name."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     await populate_agent_limits(session, agent)
@@ -168,13 +169,13 @@ async def update_one(
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Partially update an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
     # Name-uniqueness check (if name is being changed)
     if body.name is not None and body.name != agent.name:
-        existing = await agent_service.get_agent_by_name(session, body.name)
+        existing = await agent_service.get_agent_by_name(session, body.name, user_id=user.id)
         if existing is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -214,7 +215,7 @@ async def delete_one(
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Delete an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     await agent_service.delete_agent(session, agent)
@@ -237,7 +238,7 @@ async def freeze(
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Freeze an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     agent = await agent_service.freeze_agent(session, agent)
@@ -262,7 +263,7 @@ async def unfreeze(
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Unfreeze an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
     agent = await agent_service.unfreeze_agent(session, agent)
@@ -308,7 +309,7 @@ async def update_policy(
     user: User = Depends(RequireAdmin),
 ) -> AgentResponse:
     """Update an agent's spending policy."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -356,7 +357,7 @@ async def get_agent_transactions(
     user: User = Depends(get_current_user),
 ) -> list[AgentTransactionItem]:
     """Get transactions/payment requests for an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 

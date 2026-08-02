@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   Shield,
   Zap,
@@ -23,8 +23,6 @@ import {
   Moon,
 } from "lucide-react";
 import * as api from "./api";
-
-const DEFAULT_AGENT_ID = 1;
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState("dashboard");
@@ -76,29 +74,77 @@ export default function App() {
 
   const consoleEndRef = useRef(null);
 
+  const navigate = useNavigate();
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [userAgents, setUserAgents] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Load user profile and their agents list on mount
+  const loadUserProfileAndAgents = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+      const [profile, agentsList] = await Promise.all([
+        api.getMe(),
+        api.getAgents(),
+      ]);
+      setCurrentUser(profile);
+      setUserAgents(agentsList.agents || []);
+
+      if (agentsList.agents && agentsList.agents.length > 0) {
+        setSelectedAgentId(agentsList.agents[0].id);
+      } else {
+        setError("No agents configured for this account.");
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      localStorage.removeItem("token");
+      navigate("/login");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/");
+  };
+
   // Load agent data and transaction history
   const fetchData = async () => {
+    if (!selectedAgentId) return;
     try {
-      const agentData = await api.getAgent(DEFAULT_AGENT_ID);
-      const txData = await api.getTransactions(DEFAULT_AGENT_ID);
+      const [agentData, txData, profile] = await Promise.all([
+        api.getAgent(selectedAgentId),
+        api.getTransactions(selectedAgentId),
+        api.getMe(),
+      ]);
+
       setAgent(agentData);
       setTransactions(txData);
+      setCurrentUser(profile);
       setError(null);
     } catch (err) {
       console.error(err);
-      setError(
-        "Could not connect to FastAPI Backend. Make sure it is running on port 8000.",
-      );
+      setError("Could not retrieve agent details or transactions.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    loadUserProfileAndAgents();
   }, []);
+
+  useEffect(() => {
+    if (selectedAgentId) {
+      fetchData();
+      const interval = setInterval(fetchData, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedAgentId]);
 
   // Scroll to bottom of console simulator
   useEffect(() => {
@@ -167,14 +213,14 @@ export default function App() {
       async () => {
         if (isFreezing) {
           addLog("warn", "OWNER ACTION: Initiated Emergency Freeze on-chain.");
-          await api.freezeAgent(DEFAULT_AGENT_ID);
+          await api.freezeAgent(selectedAgentId);
           addLog(
             "error",
             "SYSTEM: Wallet status set to FROZEN. On-chain authority revoked.",
           );
         } else {
           addLog("info", "OWNER ACTION: Initiated Wallet Unfreeze on-chain.");
-          await api.unfreezeAgent(DEFAULT_AGENT_ID);
+          await api.unfreezeAgent(selectedAgentId);
           addLog("success", "SYSTEM: Wallet status restored to ACTIVE.");
         }
       },
@@ -197,7 +243,7 @@ export default function App() {
           "info",
           `OWNER ACTION: Updating limits (Per Tx: ${limitPerTx} ETH, Daily: ${limitDaily} ETH)`,
         );
-        await api.updatePolicy(DEFAULT_AGENT_ID, limitPerTx, limitDaily);
+        await api.updatePolicy(selectedAgentId, limitPerTx, limitDaily);
         addLog(
           "success",
           "SYSTEM: Spending limit policies updated successfully.",
@@ -236,7 +282,7 @@ export default function App() {
           "info",
           `OWNER ACTION: Allowlisting merchant "${mName}" (${mId})`,
         );
-        await api.addToAllowlist(DEFAULT_AGENT_ID, mId, mName, mAddress);
+        await api.addToAllowlist(selectedAgentId, mId, mName, mAddress);
         addLog("success", `SYSTEM: Merchant "${mName}" allowlisted on-chain.`);
         setNewMerchantId("");
         setNewMerchantName("");
@@ -260,7 +306,7 @@ export default function App() {
           "warn",
           `OWNER ACTION: Revoking allowlist authorization for "${displayName || merchantId}"`,
         );
-        await api.removeFromAllowlist(DEFAULT_AGENT_ID, merchantId);
+        await api.removeFromAllowlist(selectedAgentId, merchantId);
         addLog(
           "success",
           `SYSTEM: Merchant "${merchantId}" removed from allowlist.`,
@@ -280,7 +326,7 @@ export default function App() {
     try {
       const response = await api.requestPayment(
         randomId,
-        DEFAULT_AGENT_ID,
+        selectedAgentId,
         merchantId,
         amount,
       );
@@ -395,7 +441,10 @@ export default function App() {
 
       <div className="app-layout">
         {/* Sidebar Navigation */}
-        <aside className={`sidebar ${mobileMenuOpen ? "open" : ""}`}>
+        <aside
+          className={`sidebar ${mobileMenuOpen ? "open" : ""}`}
+          style={{ display: "flex", flexDirection: "column" }}
+        >
           <div className="sidebar-logo">
             <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
               <h1>AGENTPAY GUARD</h1>
@@ -405,7 +454,54 @@ export default function App() {
             </div>
           </div>
 
-          <nav className="sidebar-menu">
+          {userAgents.length > 0 && (
+            <div
+              style={{
+                padding: "0 1.5rem 1rem",
+                borderBottom: "1px solid var(--border-color)",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "0.75rem",
+                  textTransform: "uppercase",
+                  color: "var(--text-secondary)",
+                  display: "block",
+                  marginBottom: "0.5rem",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                Active Agent
+              </label>
+              <select
+                value={selectedAgentId || ""}
+                onChange={(e) => setSelectedAgentId(parseInt(e.target.value))}
+                style={{
+                  width: "100%",
+                  padding: "0.6rem 0.75rem",
+                  backgroundColor: "var(--bg-tertiary)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "8px",
+                  outline: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {userAgents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <nav
+            className="sidebar-menu"
+            style={{ flexGrow: 1, overflowY: "auto" }}
+          >
             <button
               className={`sidebar-menu-item ${activeScreen === "dashboard" ? "active" : ""}`}
               onClick={() => {
@@ -456,6 +552,87 @@ export default function App() {
               <Database size={16} /> Transaction Explorer
             </button>
           </nav>
+
+          {currentUser && (
+            <div
+              style={{
+                marginTop: "auto",
+                padding: "1.5rem",
+                borderTop: "1px solid var(--border-color)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: "600",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {currentUser.display_name}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Role: {currentUser.role}
+                </div>
+              </div>
+              <div
+                style={{
+                  backgroundColor: "rgba(99, 102, 241, 0.05)",
+                  border: "1px solid var(--border-color)",
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "8px",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span style={{ color: "var(--text-secondary)" }}>
+                  User Wallet:
+                </span>
+                <span
+                  style={{ fontWeight: "600", color: "var(--accent-primary)" }}
+                >
+                  {currentUser.balance?.toFixed(4) || "0.0000"} ETH
+                </span>
+              </div>
+              <button
+                onClick={handleLogout}
+                style={{
+                  width: "100%",
+                  padding: "0.6rem",
+                  backgroundColor: "rgba(255, 77, 109, 0.1)",
+                  border: "1px solid rgba(255, 77, 109, 0.2)",
+                  color: "var(--accent-danger)",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "0.88rem",
+                  fontWeight: "600",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = "var(--accent-danger)";
+                  e.target.style.color = "#fff";
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = "rgba(255, 77, 109, 0.1)";
+                  e.target.style.color = "var(--accent-danger)";
+                }}
+              >
+                Log Out
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Main Content Area */}

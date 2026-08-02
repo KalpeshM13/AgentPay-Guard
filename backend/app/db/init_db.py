@@ -30,12 +30,17 @@ async def init_db() -> None:
 
 
 async def _seed_default_owner(session: FirebaseClient) -> None:
-    """Create the default owner account if it does not already exist."""
+    """Create the default admin account if it does not already exist."""
     email = settings.DEFAULT_OWNER_EMAIL.lower().strip()
     existing = await get_user_by_email(session, email)
 
     if existing is not None:
-        logger.debug("Default owner already exists (id=%d).", existing.id)
+        logger.debug("Default admin already exists (id=%d).", existing.id)
+        if existing.role != UserRole.ADMIN or existing.display_name != "Default Admin":
+            existing.role = UserRole.ADMIN
+            existing.display_name = "Default Admin"
+            await session.update("users", existing.id, existing.to_dict())
+            logger.info("Updated existing default owner user to ADMIN role and display name.")
         return
 
     from app.services.auth_service import hash_password
@@ -46,15 +51,15 @@ async def _seed_default_owner(session: FirebaseClient) -> None:
         id=next_id,
         email=email,
         hashed_password=hash_password(settings.DEFAULT_OWNER_PASSWORD),
-        display_name="Default Owner",
-        role=UserRole.OWNER,
+        display_name="Default Admin",
+        role=UserRole.ADMIN,
         is_active=True,
     )
     await session.insert("users", next_id, user.to_dict())
     logger.info(
-        "Seeded default owner: email=%s role=%s (change password immediately!).",
+        "Seeded default admin: email=%s role=%s (change password immediately!).",
         email,
-        UserRole.OWNER.value,
+        UserRole.ADMIN.value,
     )
 
 
@@ -99,6 +104,13 @@ async def _seed_default_agent_and_merchants(session: FirebaseClient) -> None:
     
     # 2. Seed agent
     agent_data = await session.get("agents", 1)
+    
+    from app.core.config import settings
+    from app.services.auth_service import get_user_by_email
+    email = settings.DEFAULT_OWNER_EMAIL.lower().strip()
+    admin_user = await get_user_by_email(session, email)
+    admin_user_id = admin_user.id if admin_user is not None else 1
+
     if agent_data is None:
         agent = Agent(
             id=1,
@@ -110,9 +122,16 @@ async def _seed_default_agent_and_merchants(session: FirebaseClient) -> None:
             per_transaction_limit=1.0,
             daily_limit=5.0,
             max_requests_per_minute=10,
+            user_id=admin_user_id,
         )
         await session.insert("agents", 1, agent.to_dict())
-        logger.info("Seeded default agent: id=1 name=%s", agent.name)
+        logger.info("Seeded default agent: id=1 name=%s user_id=%d", agent.name, admin_user_id)
+    else:
+        agent = Agent(**agent_data)
+        if getattr(agent, "user_id", None) != admin_user_id:
+            agent.user_id = admin_user_id
+            await session.update("agents", 1, agent.to_dict())
+            logger.info("Updated existing default agent with user_id = %d", admin_user_id)
         
     # Ensure counters is set to at least 1 for agents
     counter_ref_agents = session.db.collection("counters").document("agents")

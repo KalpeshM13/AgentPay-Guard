@@ -688,9 +688,11 @@ body::before {
   border-right: 1px solid rgba(99, 102, 241, 0.1);
   display: flex;
   flex-direction: column;
-  padding: 2rem 1.5rem;
+  padding: 2rem 1.5rem 0;
   flex-shrink: 0;
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
 
 .sidebar::after {

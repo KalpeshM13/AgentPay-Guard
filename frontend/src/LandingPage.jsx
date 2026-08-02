@@ -235,8 +235,25 @@ export default function LandingPage() {
             >
               {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <Link to="/dashboard" className="lp-cta-nav desktop-only">
-              Launch Dashboard <ArrowRight size={15} />
+            <Link
+              to="/login"
+              className="lp-cta-nav-link desktop-only"
+              style={{
+                marginRight: "1.25rem",
+                color: "var(--text-primary)",
+                fontWeight: "500",
+                textDecoration: "none",
+                transition: "color 0.2s",
+              }}
+              onMouseOver={(e) =>
+                (e.target.style.color = "var(--accent-primary)")
+              }
+              onMouseOut={(e) => (e.target.style.color = "var(--text-primary)")}
+            >
+              Login
+            </Link>
+            <Link to="/register" className="lp-cta-nav desktop-only">
+              Get Started <ArrowRight size={15} />
             </Link>
             <button
               className="lp-hamburger"
@@ -290,8 +307,20 @@ export default function LandingPage() {
         <button onClick={toggleTheme}>
           {theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode"}
         </button>
-        <Link to="/dashboard" className="lp-cta-nav" onClick={closeMobileMenu}>
-          Launch Dashboard <ArrowRight size={15} />
+        <Link
+          to="/login"
+          className="lp-cta-nav"
+          onClick={closeMobileMenu}
+          style={{
+            marginBottom: "0.5rem",
+            background: "rgba(99, 102, 241, 0.05)",
+            border: "1px solid var(--border-color)",
+          }}
+        >
+          Login
+        </Link>
+        <Link to="/register" className="lp-cta-nav" onClick={closeMobileMenu}>
+          Get Started <ArrowRight size={15} />
         </Link>
       </div>
 
@@ -342,8 +371,8 @@ export default function LandingPage() {
             all without the agent having access to wallet credentials.
           </p>
           <div className="lp-hero-actions">
-            <Link to="/dashboard" className="lp-btn-primary">
-              Launch Dashboard <ArrowRight size={18} />
+            <Link to="/register" className="lp-btn-primary">
+              Get Started <ArrowRight size={18} />
             </Link>
             <a
               href="https://github.com/KalpeshM13/AgentPay-Guard"

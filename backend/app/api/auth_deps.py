@@ -52,8 +52,8 @@ async def get_current_user(
                 id=next_id,
                 email=email,
                 hashed_password=hash_password(settings.DEFAULT_OWNER_PASSWORD),
-                display_name="Default Owner",
-                role=UserRole.OWNER,
+                display_name="Default Admin",
+                role=UserRole.ADMIN,
                 is_active=True,
             )
             await session.insert("users", next_id, user.to_dict())

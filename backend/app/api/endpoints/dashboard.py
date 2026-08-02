@@ -45,7 +45,7 @@ async def summary(
     user: User = Depends(get_current_user),
 ) -> DashboardSummary:
     """Return dashboard KPIs."""
-    data = await dashboard_service.get_summary(session)
+    data = await dashboard_service.get_summary(session, user_id=user.id)
     return DashboardSummary(**data)
 
 
@@ -84,7 +84,7 @@ async def activity(
 ) -> ActivityResponse:
     """Return recent payment activity."""
     items, total = await dashboard_service.get_activity(
-        session, agent_id=agent_id, status_filter=status, limit=limit,
+        session, agent_id=agent_id, status_filter=status, limit=limit, user_id=user.id,
     )
     return ActivityResponse(total=total, items=items)
 
@@ -119,6 +119,6 @@ async def audit_log(
 ) -> AuditResponse:
     """Return recent audit log entries."""
     items, total = await dashboard_service.get_audit(
-        session, event_type=event_type, limit=limit,
+        session, event_type=event_type, limit=limit, user_id=user.id,
     )
     return AuditResponse(total=total, items=items)

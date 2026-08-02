@@ -52,24 +52,46 @@ async def get_agent_by_id(
     return agent
 
 
-async def get_agent_by_name(session: any, name: str) -> Agent | None:
-    """Fetch an agent by its unique name."""
+async def _get_admin_user_id(session: any) -> int:
+    """Helper to retrieve the seeded admin's user ID dynamically."""
+    from app.core.config import settings
+    from app.services.auth_service import get_user_by_email
+    email = settings.DEFAULT_OWNER_EMAIL.lower().strip()
+    admin_user = await get_user_by_email(session, email)
+    return admin_user.id if admin_user is not None else 1
+
+
+async def get_agent_by_name(session: any, name: str, user_id: int | None = None) -> Agent | None:
+    """Fetch an agent by its unique name, optionally filtered by user_id."""
     name_lower = name.strip().lower()
     results = await session.query("agents", [("name_lower", "==", name_lower)])
     if results:
         agent = Agent(**results[0])
+        if user_id is not None:
+            a_uid = getattr(agent, "user_id", None)
+            admin_user_id = await _get_admin_user_id(session)
+            if a_uid != user_id and not (user_id == admin_user_id and a_uid is None):
+                return None
         await _load_agent_relations(session, agent)
         return agent
     return None
 
 
 async def get_agent_by_identifier(
-    session: any, identifier: str | int
+    session: any, identifier: str | int, user_id: int | None = None
 ) -> Agent | None:
     """Fetch a single agent by PK (if integer-like) or by name (case-insensitively)."""
     try:
         agent_id = int(identifier)
-        return await get_agent_by_id(session, agent_id)
+        agent = await get_agent_by_id(session, agent_id)
+        if agent:
+            a_uid = getattr(agent, "user_id", None)
+            if user_id is not None:
+                admin_user_id = await _get_admin_user_id(session)
+                if a_uid != user_id and not (user_id == admin_user_id and a_uid is None):
+                    return None
+            return agent
+        return None
     except ValueError:
         name_str = str(identifier).strip().lower()
         # Query normal, replace underscores/hyphens for fuzzy matches
@@ -77,6 +99,11 @@ async def get_agent_by_identifier(
             results = await session.query("agents", [("name_lower", "==", n_str)])
             if results:
                 agent = Agent(**results[0])
+                a_uid = getattr(agent, "user_id", None)
+                if user_id is not None:
+                    admin_user_id = await _get_admin_user_id(session)
+                    if a_uid != user_id and not (user_id == admin_user_id and a_uid is None):
+                        continue
                 await _load_agent_relations(session, agent)
                 return agent
         return None
@@ -88,22 +115,36 @@ async def list_agents(
     status: AgentStatus | None = None,
     skip: int = 0,
     limit: int = 100,
+    user_id: int | None = None,
 ) -> tuple[list[Agent], int]:
     """Return a page of agents with an optional status filter, ordered by id."""
-    filters = []
-    if status is not None:
-        filters.append(("status", "==", status.value if isinstance(status, AgentStatus) else status))
-        
-    # Get total count (using lightweight query or just fetching all if database is small)
-    all_matching = await session.query("agents", filters=filters)
-    total = len(all_matching)
+    all_matching = await session.query("agents")
     
-    # Query with offset & limit
-    matching_page = await session.query("agents", filters=filters, order_by="id", limit=limit, offset=skip)
+    filtered = []
+    for data in all_matching:
+        # Status filter
+        if status is not None:
+            a_status = data.get("status")
+            status_val = status.value if isinstance(status, AgentStatus) else status
+            if a_status != status_val:
+                continue
+        
+        # User ID filter
+        a_uid = data.get("user_id")
+        if user_id is not None:
+            admin_user_id = await _get_admin_user_id(session)
+            if a_uid != user_id and not (user_id == admin_user_id and a_uid is None):
+                continue
+        filtered.append(Agent(**data))
+        
+    # Order by id
+    filtered.sort(key=lambda x: x.id)
+    
+    total = len(filtered)
+    matching_page = filtered[skip : skip + limit]
     
     agents = []
-    for data in matching_page:
-        agent = Agent(**data)
+    for agent in matching_page:
         await _load_agent_relations(session, agent)
         agents.append(agent)
         
@@ -123,6 +164,7 @@ async def create_agent(
     per_transaction_limit: float,
     daily_limit: float,
     max_requests_per_minute: int,
+    user_id: int | None = None,
 ) -> Agent:
     """Create a new agent and persist it in Firestore."""
     next_id = await session.get_next_id("agents")
@@ -138,6 +180,7 @@ async def create_agent(
         max_requests_per_minute=max_requests_per_minute,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
+        user_id=user_id,
     )
     await session.insert("agents", next_id, agent.to_dict())
 
@@ -149,6 +192,7 @@ async def create_agent(
             "per_transaction_limit": agent.per_transaction_limit,
             "daily_limit": agent.daily_limit,
         },
+        user_id=user_id,
     )
 
     logger.info(
@@ -213,6 +257,7 @@ async def update_agent(
                 "agent_id": agent.id, "agent_name": agent.name,
                 "changes": policy_changed,
             },
+            user_id=getattr(agent, "user_id", None),
         )
 
     logger.info("Agent %d updated in Firestore: %s", agent.id, ", ".join(changed))
@@ -242,6 +287,7 @@ async def freeze_agent(session: any, agent: Agent) -> Agent:
     await _write_audit(
         session, actor="system", event_type=AuditEventType.AGENT_FROZEN,
         details={"agent_id": agent.id, "agent_name": agent.name},
+        user_id=getattr(agent, "user_id", None),
     )
 
     logger.info("Agent %d FROZEN", agent.id)
@@ -257,6 +303,7 @@ async def unfreeze_agent(session: any, agent: Agent) -> Agent:
     await _write_audit(
         session, actor="system", event_type=AuditEventType.AGENT_UNFROZEN,
         details={"agent_id": agent.id, "agent_name": agent.name},
+        user_id=getattr(agent, "user_id", None),
     )
 
     logger.info("Agent %d UNFROZEN", agent.id)
@@ -273,6 +320,7 @@ async def _write_audit(
     actor: str,
     event_type: AuditEventType,
     details: dict,
+    user_id: int | None = None,
 ) -> None:
     """Append an audit-log entry to Firestore."""
     next_id = await session.get_next_id("audit_events")
@@ -282,5 +330,6 @@ async def _write_audit(
         event_type=event_type.value,
         details=json.dumps(details),
         timestamp=datetime.now(timezone.utc),
+        user_id=user_id,
     )
     await session.insert("audit_events", next_id, audit.to_dict())

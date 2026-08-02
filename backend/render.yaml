@@ -1,17 +1,3 @@
-# =============================================================================
-# Render Blueprint — AgentPay Guard
-# =============================================================================
-# Auto-deploy from your Git repo:
-#   1. Push to GitHub / GitLab.
-#   2. Create a new Web Service on Render → "Blueprint" → point at this repo.
-#
-# Free-tier specs:
-#   - 512 MB RAM
-#   - Shared CPU
-#   - No persistent disk (SQLite lives on ephemeral filesystem — use
-#     a managed DB for production)
-# =============================================================================
-
 services:
   - type: web
     name: agentpay-guard
@@ -39,16 +25,17 @@ services:
 
       # Generate a real secret:  python -c "import secrets; print(secrets.token_hex(32))"
       - key: SECRET_KEY
-        sync: false # prompt on first deploy
+        sync: false # Prompts you for a unique key on first deploy
 
+      # ---- Admin Account Seeding ---------------------------------------------
       - key: DEFAULT_OWNER_EMAIL
-        value: "admin@agentpay.dev"
+        sync: false # Prompts you for your secure admin email on first deploy
       - key: DEFAULT_OWNER_PASSWORD
-        value: "admin123"
+        sync: false # Prompts you for your secure admin password on first deploy
 
-      # ---- Database (SQLite on ephemeral disk — ok for demo / MVP) -----------
-      - key: DATABASE_URL
-        value: "sqlite+aiosqlite:///data/agentpay.db"
+      # ---- Firebase Configuration --------------------------------------------
+      - key: FIREBASE_CREDENTIALS
+        sync: false # Prompts you to paste your service account JSON string
 
       # ---- AI (optional — leave blank to disable) ----------------------------
       - key: GROQ_API_KEY

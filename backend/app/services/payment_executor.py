@@ -42,6 +42,19 @@ async def execute(
             f"Insufficient balance: need {amount}, have {agent.balance}"
         )
 
+    # Load and deduct from the user's balance
+    user_id = getattr(agent, "user_id", None)
+    if user_id is not None:
+        user_data = await session.get("users", user_id)
+        if user_data:
+            user_balance = float(user_data.get("balance", 10.0))
+            if amount > user_balance:
+                raise ValueError(
+                    f"Insufficient user balance: need {amount}, have {user_balance}"
+                )
+            user_data["balance"] = max(0.0, user_balance - amount)
+            await session.update("users", user_id, user_data)
+
     balance_before = agent.balance
     agent.balance -= amount
 
@@ -55,6 +68,7 @@ async def execute(
         id=pr_id,
         request_id=request_id,
         agent_id=agent.id,
+        user_id=user_id,
         merchant_id=merchant_id,
         amount=amount,
         status="SETTLED",
@@ -66,6 +80,7 @@ async def execute(
         id=tx_id,
         request_id=request_id,
         agent_id=agent.id,
+        user_id=user_id,
         amount=amount,
         balance_before=balance_before,
         balance_after=agent.balance,
@@ -76,6 +91,7 @@ async def execute(
         id=audit_id,
         actor=f"agent:{agent.id}",
         event_type=AuditEventType.PAYMENT_SETTLED.value,
+        user_id=user_id,
         details=json.dumps({
             "request_id": request_id,
             "agent_id": agent.id,

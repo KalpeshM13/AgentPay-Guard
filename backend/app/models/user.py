@@ -24,6 +24,8 @@ class User(Base):
             self.is_active = True
         if not hasattr(self, "role"):
             self.role = UserRole.VIEWER
+        if not hasattr(self, "balance"):
+            self.balance = 10.0
         
         # Ensure role is UserRole enum type
         if hasattr(self, "role") and isinstance(self.role, str):

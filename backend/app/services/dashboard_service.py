@@ -15,31 +15,86 @@ from app.core.constants import AgentStatus
 logger = logging.getLogger(__name__)
 
 
+async def _get_admin_user_id(session: any) -> int:
+    """Helper to retrieve the seeded admin's user ID dynamically."""
+    from app.core.config import settings
+    from app.services.auth_service import get_user_by_email
+    email = settings.DEFAULT_OWNER_EMAIL.lower().strip()
+    admin_user = await get_user_by_email(session, email)
+    return admin_user.id if admin_user is not None else 1
+
+
 # =============================================================================
 # GET /dashboard/summary
 # =============================================================================
 
-async def get_summary(session: any) -> dict:
+async def get_summary(session: any, user_id: int | None = None) -> dict:
     """Return the KPIs the owner dashboard needs."""
     today = _today_start()
+    admin_user_id = await _get_admin_user_id(session) if user_id is not None else 1
 
     # -- Agent counts & balance ----------------------------------------------
     agents = await session.query("agents")
-    total_agents = len(agents)
-    frozen_agents = sum(1 for a in agents if a.get("status") == AgentStatus.FROZEN.value)
+    filtered_agents = []
+    for a in agents:
+        a_uid = a.get("user_id")
+        if user_id is not None:
+            if a_uid != user_id and not (user_id == admin_user_id and a_uid is None):
+                continue
+        filtered_agents.append(a)
+        
+    total_agents = len(filtered_agents)
+    frozen_agents = sum(1 for a in filtered_agents if a.get("status") == AgentStatus.FROZEN.value)
     active_agents = total_agents - frozen_agents
-    total_balance = sum(float(a.get("balance", 0.0)) for a in agents)
+    total_balance = sum(float(a.get("balance", 0.0)) for a in filtered_agents)
 
     # -- Today's spending (only settled transactions) ------------------------
-    # Since Firestore query filter combinations are restricted without composite indexes,
-    # we can fetch all transactions from today and filter/aggregate locally.
-    transactions = await session.query("transactions", [("settled_at", ">=", today)])
-    today_spending = sum(float(tx.get("amount", 0.0)) for tx in transactions)
+    transactions = await session.query("transactions")
+    today_spending = 0.0
+    for tx in transactions:
+        # filter user_id
+        tx_uid = tx.get("user_id")
+        if user_id is not None:
+            if tx_uid != user_id and not (user_id == admin_user_id and tx_uid is None):
+                continue
+        # check settled_at >= today
+        settled_at = tx.get("settled_at")
+        if settled_at:
+            if hasattr(settled_at, "to_datetime"):
+                settled_at_dt = settled_at.to_datetime()
+            elif isinstance(settled_at, str):
+                settled_at_dt = datetime.fromisoformat(settled_at.replace("Z", "+00:00"))
+            else:
+                settled_at_dt = settled_at
+            
+            if settled_at_dt >= today:
+                today_spending += float(tx.get("amount", 0.0))
 
     # -- Today's request counts ----------------------------------------------
-    requests_today = await session.query("payment_requests", [("created_at", ">=", today)])
-    today_settled = sum(1 for pr in requests_today if pr.get("status") == "SETTLED")
-    today_blocked = sum(1 for pr in requests_today if pr.get("status") == "BLOCKED")
+    requests_today = await session.query("payment_requests")
+    today_settled = 0
+    today_blocked = 0
+    for pr in requests_today:
+        # filter user_id
+        pr_uid = pr.get("user_id")
+        if user_id is not None:
+            if pr_uid != user_id and not (user_id == admin_user_id and pr_uid is None):
+                continue
+        # check today
+        created_at = pr.get("created_at")
+        if created_at:
+            if hasattr(created_at, "to_datetime"):
+                created_at_dt = created_at.to_datetime()
+            elif isinstance(created_at, str):
+                created_at_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            else:
+                created_at_dt = created_at
+            
+            if created_at_dt >= today:
+                if pr.get("status") == "SETTLED":
+                    today_settled += 1
+                elif pr.get("status") == "BLOCKED":
+                    today_blocked += 1
 
     return {
         "total_agents": total_agents,
@@ -62,19 +117,27 @@ async def get_activity(
     agent_id: int | None = None,
     status_filter: str | None = None,
     limit: int = 50,
+    user_id: int | None = None,
 ) -> tuple[list[dict], int]:
     """Return recent payment requests (SETTLED + BLOCKED), newest first."""
-    filters = []
-    if agent_id is not None:
-        filters.append(("agent_id", "==", agent_id))
-    if status_filter is not None:
-        filters.append(("status", "==", status_filter))
-
-    # Fetch matching payment requests ordered by created_at desc
-    # In Firestore, sorting and filtering requires composite indexes unless it is simple.
-    # To be safe and avoid composite index errors, we can query matching docs, sort locally, and apply limit.
-    all_reqs = await session.query("payment_requests", filters=filters)
+    all_reqs = await session.query("payment_requests")
+    admin_user_id = await _get_admin_user_id(session) if user_id is not None else 1
     
+    filtered_reqs = []
+    for r in all_reqs:
+        # Filter user_id
+        r_uid = r.get("user_id")
+        if user_id is not None:
+            if r_uid != user_id and not (user_id == admin_user_id and r_uid is None):
+                continue
+        # Filter agent_id
+        if agent_id is not None and r.get("agent_id") != agent_id:
+            continue
+        # Filter status
+        if status_filter is not None and r.get("status") != status_filter:
+            continue
+        filtered_reqs.append(r)
+
     # Sort locally by created_at desc
     def get_created_at(pr):
         ca = pr.get("created_at")
@@ -89,10 +152,10 @@ async def get_activity(
                 pass
         return ca
         
-    all_reqs.sort(key=get_created_at, reverse=True)
+    filtered_reqs.sort(key=get_created_at, reverse=True)
     
-    total = len(all_reqs)
-    rows = all_reqs[:limit]
+    total = len(filtered_reqs)
+    rows = filtered_reqs[:limit]
 
     # Resolve agent names in batch
     agent_ids = {r.get("agent_id") for r in rows if r.get("agent_id") is not None}
@@ -129,15 +192,24 @@ async def get_audit(
     *,
     event_type: str | None = None,
     limit: int = 50,
+    user_id: int | None = None,
 ) -> tuple[list[dict], int]:
     """Return recent audit-log entries, newest first."""
-    filters = []
-    if event_type is not None:
-        filters.append(("event_type", "==", event_type))
-
-    # Fetch matching audit events, sort locally to avoid index creation requirements
-    all_audits = await session.query("audit_events", filters=filters)
+    all_audits = await session.query("audit_events")
+    admin_user_id = await _get_admin_user_id(session) if user_id is not None else 1
     
+    filtered_audits = []
+    for r in all_audits:
+        # Filter user_id
+        r_uid = r.get("user_id")
+        if user_id is not None:
+            if r_uid != user_id and not (user_id == admin_user_id and r_uid is None):
+                continue
+        # Filter event_type
+        if event_type is not None and r.get("event_type") != event_type:
+            continue
+        filtered_audits.append(r)
+        
     def get_timestamp(audit):
         ts = audit.get("timestamp")
         if ts is None:
@@ -151,23 +223,15 @@ async def get_audit(
                 pass
         return ts
         
-    all_audits.sort(key=get_timestamp, reverse=True)
+    filtered_audits.sort(key=get_timestamp, reverse=True)
     
-    total = len(all_audits)
-    rows = all_audits[:limit]
+    total = len(filtered_audits)
+    rows = filtered_audits[:limit]
 
     items = []
     for r in rows:
         ts_dt = get_timestamp(r)
-        
-        # Details in Firestore might be a dict or a serialized JSON string.
         details_val = r.get("details")
-        if isinstance(details_val, str):
-            try:
-                # If it's a JSON string, try to parse it or keep it as is
-                pass
-            except Exception:
-                pass
 
         items.append({
             "id": r.get("id"),

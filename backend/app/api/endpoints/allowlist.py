@@ -47,7 +47,7 @@ async def list_entries(
     user: User = Depends(get_current_user),
 ) -> AllowlistResponse:
     """List allowlist entries for an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -92,7 +92,7 @@ async def add_entry(
 ) -> AllowlistEntryResponse:
     """Add a merchant to an agent's allowlist."""
     # Validate agent exists
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -143,7 +143,7 @@ async def remove_entry(
     user: User = Depends(RequireAdmin),
 ) -> None:
     """Remove a merchant from an agent's allowlist."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
         

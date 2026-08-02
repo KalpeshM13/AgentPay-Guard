@@ -118,11 +118,45 @@ async def register_user(
         email=email.lower().strip(),
         hashed_password=hash_password(plain_password),
         display_name=display_name.strip(),
-        role="viewer",
+        role="owner",
         is_active=True,
+        balance=10.0,
     )
     await session.insert("users", next_id, user.to_dict())
     logger.info("User registered in Firestore: id=%d email=%s role=%s", user.id, user.email, user.role)
+
+    # Auto-create default agent for this user
+    try:
+        from app.services.agent_service import create_agent
+        from app.services.allowlist_service import add_to_allowlist
+        from app.models.merchant import Merchant
+
+        # Clean display name for agent name (alphanumeric + underscore/hyphen)
+        clean_name = "".join(c for c in user.display_name if c.isalnum() or c in ("-", "_")).strip()
+        if not clean_name:
+            clean_name = "User"
+        agent_name = f"Agent-{clean_name}"
+
+        agent = await create_agent(
+            session,
+            name=agent_name,
+            description="Default autonomous spending agent",
+            balance=10.0,
+            per_transaction_limit=1.0,
+            daily_limit=5.0,
+            max_requests_per_minute=10,
+            user_id=user.id,
+        )
+
+        # Seed allowlist with default merchants (1, 2, 3, 4)
+        for mid in [1, 2, 3, 4]:
+            m_data = await session.get("merchants", mid)
+            if m_data:
+                merchant = Merchant(**m_data)
+                await add_to_allowlist(session, agent, merchant)
+    except Exception as e:
+        logger.error(f"Failed to auto-create default agent/allowlist for user {user.id}: {e}")
+
     return user
 
 
