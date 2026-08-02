@@ -60,6 +60,7 @@ export default function App() {
   const [agent, setAgent] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   // MetaMask Real Wallet integration
@@ -220,10 +221,24 @@ export default function App() {
   };
 
   const handleRefreshAll = async () => {
-    setLoading(true);
-    await loadUserProfileAndAgents();
-    await checkConnection();
-    await fetchData();
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    const startTime = Date.now();
+    try {
+      await loadUserProfileAndAgents();
+      await checkConnection();
+      await fetchData();
+    } catch (err) {
+      console.error("Refresh error:", err);
+    } finally {
+      // Ensure the spin animation plays for at least 1000ms for visual feedback
+      const elapsedTime = Date.now() - startTime;
+      const minDuration = 1000;
+      if (elapsedTime < minDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsedTime));
+      }
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -1041,9 +1056,10 @@ export default function App() {
                 <button
                   className="btn btn-secondary"
                   onClick={handleRefreshAll}
+                  disabled={isRefreshing}
                   title="Refresh details"
                 >
-                  <RefreshCw size={14} /> Refresh
+                  <RefreshCw size={14} className={isRefreshing ? "spin-anim" : ""} /> Refresh
                 </button>
               </div>
 
@@ -2039,8 +2055,9 @@ export default function App() {
                 <button
                   className="btn btn-secondary"
                   onClick={handleRefreshAll}
+                  disabled={isRefreshing}
                 >
-                  <RefreshCw size={14} /> Refresh
+                  <RefreshCw size={14} className={isRefreshing ? "spin-anim" : ""} /> Refresh
                 </button>
               </div>
 
