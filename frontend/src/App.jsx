@@ -170,6 +170,7 @@ export default function App() {
           addLog("warn", "OWNER ACTION: Initiated Emergency Freeze on-chain.");
           await web3.freezeWallet();
           await api.freezeAgent(DEFAULT_AGENT_ID);
+          await fetchData();
           addLog(
             "error",
             "SYSTEM: Wallet status set to FROZEN. On-chain authority revoked.",
@@ -178,6 +179,7 @@ export default function App() {
           addLog("info", "OWNER ACTION: Initiated Wallet Unfreeze on-chain.");
           await web3.unfreezeWallet();
           await api.unfreezeAgent(DEFAULT_AGENT_ID);
+          await fetchData();
           addLog("success", "SYSTEM: Wallet status restored to ACTIVE.");
         }
       },
@@ -242,6 +244,7 @@ export default function App() {
         );
         await web3.allowlistTarget(mAddress, true);
         await api.addToAllowlist(DEFAULT_AGENT_ID, mId, mName, mAddress);
+        await fetchData();
         addLog("success", `SYSTEM: Merchant "${mName}" allowlisted on-chain.`);
         setNewMerchantId("");
         setNewMerchantName("");

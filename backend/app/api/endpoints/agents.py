@@ -34,7 +34,7 @@ async def populate_agent_limits(session, agent) -> None:
     agent.spent_today = spent_today
     agent.remaining_daily_limit = max(0.0, agent.daily_limit - spent_today)
     agent.per_tx_limit = agent.per_transaction_limit
-    if not hasattr(agent, "allowlist") or agent.allowlist is None:
+    if not hasattr(agent, "allowlist_entries") or agent.allowlist_entries is None:
         await _load_agent_relations(session, agent)
 
 
