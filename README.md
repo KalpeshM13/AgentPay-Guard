@@ -14,12 +14,12 @@ AgentPay Guard is a security layer for autonomous AI agents that need to make pa
 
 > Built to stop unsafe money movement before it happens.
 
-| Layer | Role |
-| :--- | :--- |
-| Policy Server | Evaluates each payment before execution |
-| Dashboard | Lets owners configure limits and freeze agents |
-| Payment Executor | Performs settlement only after approval |
-| Audit Log | Records every decision for review |
+| Layer            | Role                                           |
+| :--------------- | :--------------------------------------------- |
+| Policy Server    | Evaluates each payment before execution        |
+| Dashboard        | Lets owners configure limits and freeze agents |
+| Payment Executor | Performs settlement only after approval        |
+| Audit Log        | Records every decision for review              |
 
 ---
 
@@ -51,16 +51,16 @@ The result is a payment control system where policy validation happens server-si
 
 ## Key Features
 
-| Feature | What it does |
-| :--- | :--- |
+| Feature                      | What it does                                                          |
+| :--------------------------- | :-------------------------------------------------------------------- |
 | 🛡️ Independent Policy Engine | Evaluates each payment request with a separate, trusted policy layer. |
-| 💰 Spending Limits | Enforces per-transaction and daily cumulative limits. |
-| 📋 Merchant Allowlist | Accepts payments only for approved counterparties. |
-| 🚨 Kill Switch | Lets an owner freeze an agent instantly and block future payments. |
-| 📜 Audit Logs | Records approvals, rejections, and policy decisions for review. |
-| ⚡ Real-Time Validation | Rejects risky requests before execution. |
-| 🔒 Server-Side Secrets | Keeps payment credentials out of the agent and frontend layer. |
-| 🧠 Agent Isolation | Prevents the AI from directly controlling the payment path. |
+| 💰 Spending Limits           | Enforces per-transaction and daily cumulative limits.                 |
+| 📋 Merchant Allowlist        | Accepts payments only for approved counterparties.                    |
+| 🚨 Kill Switch               | Lets an owner freeze an agent instantly and block future payments.    |
+| 📜 Audit Logs                | Records approvals, rejections, and policy decisions for review.       |
+| ⚡ Real-Time Validation      | Rejects risky requests before execution.                              |
+| 🔒 Server-Side Secrets       | Keeps payment credentials out of the agent and frontend layer.        |
+| 🧠 Agent Isolation           | Prevents the AI from directly controlling the payment path.           |
 
 ---
 
@@ -101,28 +101,28 @@ This workflow ensures that every payment is evaluated before execution and that 
 
 ## Threat Model
 
-| Attack | Status | Explanation |
-| :--- | :--- | :--- |
-| Prompt Injection | ✅ Mitigated | Server-side policy checks override prompt-based instructions. |
-| Replay Attack | ✅ Mitigated | Unique request identifiers and duplicate detection reduce replay risk. |
-| Overspending | ✅ Mitigated | Hard per-transaction and daily spend ceilings are enforced. |
-| Unknown Merchant | ✅ Mitigated | Allowlist enforcement blocks unapproved counterparties. |
-| Split Payments | ✅ Mitigated | Policy checks can detect attempts to bypass limits through fragmentation. |
-| Frozen Agent | ✅ Mitigated | The kill switch rejects all future requests when the agent is frozen. |
-| Velocity Attack | ✅ Mitigated | Rate and repeat-pattern logic can be applied to suspicious request bursts. |
+| Attack             | Status       | Explanation                                                                    |
+| :----------------- | :----------- | :----------------------------------------------------------------------------- |
+| Prompt Injection   | ✅ Mitigated | Server-side policy checks override prompt-based instructions.                  |
+| Replay Attack      | ✅ Mitigated | Unique request identifiers and duplicate detection reduce replay risk.         |
+| Overspending       | ✅ Mitigated | Hard per-transaction and daily spend ceilings are enforced.                    |
+| Unknown Merchant   | ✅ Mitigated | Allowlist enforcement blocks unapproved counterparties.                        |
+| Split Payments     | ✅ Mitigated | Policy checks can detect attempts to bypass limits through fragmentation.      |
+| Frozen Agent       | ✅ Mitigated | The kill switch rejects all future requests when the agent is frozen.          |
+| Velocity Attack    | ✅ Mitigated | Rate and repeat-pattern logic can be applied to suspicious request bursts.     |
 | Duplicate Requests | ✅ Mitigated | Requests are logged and validated to prevent accidental or repeated execution. |
 
 ---
 
 ## Technology Stack
 
-| Category | Technology |
-| :--- | :--- |
-| Frontend | React + Vite |
-| Backend | FastAPI |
-| Auth | Firebase Authentication |
+| Category   | Technology                            |
+| :--------- | :------------------------------------ |
+| Frontend   | React + Vite                          |
+| Backend    | FastAPI                               |
+| Auth       | Firebase Authentication               |
 | Data Layer | Firebase Firestore / backend services |
-| Language | Python + JavaScript |
+| Language   | Python + JavaScript                   |
 | Deployment | Render / Vercel-friendly architecture |
 
 ---
@@ -157,16 +157,16 @@ AgentPay-Guard/
 
 ## API Reference
 
-| Method | Endpoint | Purpose |
-| :--- | :--- | :--- |
-| POST | /api/v1/payments | Submit a payment request from an agent. |
-| POST | /api/v1/agents/{id}/freeze | Freeze an agent immediately. |
-| POST | /api/v1/agents/{id}/unfreeze | Re-enable an agent. |
-| PUT | /api/v1/agents/{id}/policy | Update spend limits and policy settings. |
-| POST | /api/v1/agents/{id}/allowlist | Add an approved merchant. |
-| DELETE | /api/v1/agents/{id}/allowlist/{merchant} | Remove a merchant from the allowlist. |
-| GET | /api/v1/agents/{id} | Retrieve agent status and policy details. |
-| GET | /api/v1/agents/{id}/transactions | Load transaction history. |
+| Method | Endpoint                                 | Purpose                                   |
+| :----- | :--------------------------------------- | :---------------------------------------- |
+| POST   | /api/v1/payments                         | Submit a payment request from an agent.   |
+| POST   | /api/v1/agents/{id}/freeze               | Freeze an agent immediately.              |
+| POST   | /api/v1/agents/{id}/unfreeze             | Re-enable an agent.                       |
+| PUT    | /api/v1/agents/{id}/policy               | Update spend limits and policy settings.  |
+| POST   | /api/v1/agents/{id}/allowlist            | Add an approved merchant.                 |
+| DELETE | /api/v1/agents/{id}/allowlist/{merchant} | Remove a merchant from the allowlist.     |
+| GET    | /api/v1/agents/{id}                      | Retrieve agent status and policy details. |
+| GET    | /api/v1/agents/{id}/transactions         | Load transaction history.                 |
 
 Interactive API docs are available at `/docs` when the backend is running.
 
@@ -248,10 +248,10 @@ Placeholder assets for future documentation and demos:
 
 ## Attack Demonstrations
 
-| Scenario | Expected Result |
-| :--- | :--- |
-| Prompt tries to raise the daily limit | Request is denied by policy validation. |
-| Agent attempts a payment to an unknown merchant | The payment is blocked. |
-| Overspend attempt after limit is reached | The request fails before execution. |
-| Agent is frozen and then asked to pay | The request is rejected immediately. |
-| Duplicate payment request arrives twice | The second request is detected and blocked. |
+| Scenario                                        | Expected Result                             |
+| :---------------------------------------------- | :------------------------------------------ |
+| Prompt tries to raise the daily limit           | Request is denied by policy validation.     |
+| Agent attempts a payment to an unknown merchant | The payment is blocked.                     |
+| Overspend attempt after limit is reached        | The request fails before execution.         |
+| Agent is frozen and then asked to pay           | The request is rejected immediately.        |
+| Duplicate payment request arrives twice         | The second request is detected and blocked. |
