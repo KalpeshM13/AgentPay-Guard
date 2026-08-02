@@ -1,254 +1,257 @@
-# AgentPay Guard
+<div align="center">
 
-> **Kill Switch & Policy-Enforced Payments for Autonomous AI Agents**
+# 🔐 AgentPay Guard
 
-AgentPay Guard is a payment-control layer for autonomous AI agents. Instead of trusting an agent to obey spending rules via internal system prompts or inline code constraints (which are prone to jailbreaks, bugs, or prompt-injection attacks), every payment request is routed through an independent backend that owns the payment credentials and enforces predefined financial policies. The agent cannot change those policies or bypass the backend.
+### Secure, policy-enforced payments for autonomous AI agents
 
----
+A security-first control layer for AI agents that need to make payments without bypassing independent safeguards.
 
-## 1. Executive Summary
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/) [![Vite](https://img.shields.io/badge/Vite-8%2B-646CFF?logo=vite&logoColor=white)](https://vite.dev/) [![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
 
-| Requirement                                       | How AgentPay Guard satisfies it                                                                                      |
-| :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------- |
-| **Wallet/contract-level independent enforcement** | A trusted Policy Server sits between the agent and the payment executor; only the server can move funds.             |
-| **Spend limits**                                  | Per-transaction, daily cumulative, and optional velocity limits are checked before execution.                        |
-| **Allowlisted counterparties**                    | Payments are accepted only for owner-approved merchant IDs/accounts.                                                 |
-| **Owner kill switch**                             | Owner dashboard changes agent status to `FROZEN`; all subsequent payment requests fail instantly.                    |
-| **Attack resistance**                             | Overspend, unknown merchant, split-payment, replay/rate-limit, and frozen-agent attempts are rejected.               |
-| **In-flight revocation (Bonus)**                  | High-risk payments enter a short `PENDING` state and are rechecked before final execution.                           |
-| **Real-world plausibility**                       | The simulated wallet can later be replaced with a sandbox payment provider without changing the policy architecture. |
+</div>
 
----
+AgentPay Guard is a security layer for autonomous AI agents that need to make payments. Instead of trusting an agent to follow spending rules through prompt text alone, every payment request is validated by an independent backend that owns the execution path and enforces hard financial policies. The agent can request a payment, but it cannot bypass the safeguards.
 
-## 2. Security Invariant
+> Built to stop unsafe money movement before it happens.
 
-> **The AI agent never possesses the bank/payment-provider secret key, API key, or unrestricted wallet credential.**
+| Layer | Role |
+| :--- | :--- |
+| Policy Server | Evaluates each payment before execution |
+| Dashboard | Lets owners configure limits and freeze agents |
+| Payment Executor | Performs settlement only after approval |
+| Audit Log | Records every decision for review |
 
 ---
 
-## 3. Product Concept
+## Overview
 
-The system consists of five logical parts:
+Prompt-based payment restrictions are fragile. In practice, they can be undermined by prompt injection, jailbreaks, model bugs, or simple developer oversight. When an AI agent is allowed to act with financial authority without a separate enforcement layer, the system becomes vulnerable to overspending, unauthorized transfers, and inconsistent controls.
 
-1. **AI Agent**: Decides what it wants to buy/pay for and sends a payment request.
-2. **Policy Server**: Independently validates status, counterparty, amount, cumulative spend, and velocity.
-3. **Payment Executor**: The only component allowed to debit the simulated/real account.
-4. **Owner Dashboard**: Configures limits, manages allowlists, monitors activity, and freezes/unfreezes the agent.
-5. **Database/Audit Log**: Stores agents, policies, counterparties, requests, decisions, and timestamps.
+AgentPay Guard solves this by introducing a trustworthy policy boundary between the agent and the payment executor. The policy server evaluates every request independently, blocks unsafe actions, and logs the decision for later review.
+
+> The AI agent never owns the payment credential path. The policy layer remains the source of truth.
 
 ---
 
-## 4. High-Level Architecture
+## Why AgentPay Guard?
 
+AgentPay Guard is built around a simple security philosophy: independent enforcement must exist outside the agent itself.
+
+That means the system is designed to resist:
+
+- Prompt Injection
+- Jailbreaks
+- Agent Bugs
+- Unauthorized API Calls
+- Direct Wallet Access
+
+The result is a payment control system where policy validation happens server-side, before any money movement is allowed.
+
+---
+
+## Key Features
+
+| Feature | What it does |
+| :--- | :--- |
+| 🛡️ Independent Policy Engine | Evaluates each payment request with a separate, trusted policy layer. |
+| 💰 Spending Limits | Enforces per-transaction and daily cumulative limits. |
+| 📋 Merchant Allowlist | Accepts payments only for approved counterparties. |
+| 🚨 Kill Switch | Lets an owner freeze an agent instantly and block future payments. |
+| 📜 Audit Logs | Records approvals, rejections, and policy decisions for review. |
+| ⚡ Real-Time Validation | Rejects risky requests before execution. |
+| 🔒 Server-Side Secrets | Keeps payment credentials out of the agent and frontend layer. |
+| 🧠 Agent Isolation | Prevents the AI from directly controlling the payment path. |
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Owner[Owner] --> Dashboard[Dashboard]
+    Dashboard --> Policy[Policy Server]
+    Agent[AI Agent] --> Policy
+    Policy -->|Allow| Executor[Payment Executor]
+    Policy -->|Deny| Audit[Audit Log]
+    Executor --> Wallet[Wallet / Sandbox]
+    Wallet --> Audit
+    Audit --> Dashboard
 ```
-HUMAN OWNER
-     │
-     │ set limits / allowlist / FREEZE
-     ▼
-OWNER DASHBOARD
-     │
-     ▼
-POLICY SERVER <───────────────── AI AGENT
-     │                               │
-     │ checks every request          │ POST /payments
-     │
-     ├── status active?
-     ├── merchant allowed?
-     ├── per-tx limit?
-     ├── daily limit?
-     └── rate/velocity limit?
-     │
- [ PASS / FAIL ]
-     │
-     ├─── FAIL ────> Audit log + BLOCK
-     │
-    PASS
-     ▼
-PAYMENT EXECUTOR
-     │
-     ▼
-SIMULATED WALLET / PAYMENT SANDBOX
-     │
-     ▼
-TRANSACTION + AUDIT LOG
+
+The architecture is intentionally split into a control plane and an execution plane. The dashboard configures policy, the policy server evaluates requests, and the executor performs settlement only after approval.
+
+---
+
+## Payment Workflow
+
+```mermaid
+flowchart TD
+    A[AI Agent] --> B[Payment Request]
+    B --> C[Policy Validation]
+    C --> D{Decision}
+    D -->|Allow| E[Payment Execution]
+    D -->|Deny| F[Reject & Audit]
+    E --> G[Audit Logging]
+    F --> G
 ```
 
----
-
-## 5. Recommended Beginner Tech Stack
-
-- **Agent**: Python (easy scripting, API calls, and LLM integration).
-- **Backend/API**: FastAPI (simple REST endpoints, automatic API docs, Python-native).
-- **Database**: SQLite + SQLAlchemy (zero setup, ideal for hackathon MVP).
-- **Dashboard**: Streamlit (fastest way to build a working Python UI).
-- **Payment Layer**: Simulated wallet first (no financial onboarding, deterministic demo).
-- **LLM**: Optional LLM API (add only after transaction controls work).
-- **Testing**: `pytest` / simple scripts (to automate attack scenarios).
-- **Deployment**: Localhost initially.
+This workflow ensures that every payment is evaluated before execution and that every outcome is recorded.
 
 ---
 
-## 6. MVP Scope vs. Stretch Scope
+## Threat Model
 
-| MVP (Build this first) | Stretch (Only if MVP works)             |
-| :--------------------- | :-------------------------------------- |
-| Per-transaction limit  | Hourly/velocity limits                  |
-| Daily cumulative limit | Automatic anomaly-triggered freeze      |
-| Merchant allowlist     | Risk score                              |
-| Manual freeze/unfreeze | Multiple agents with separate policies  |
-| Transaction log        | Role-based owner/admin access           |
-| Simulated balance      | Payment-provider sandbox                |
-| Attack demo            | Pending payments / in-flight revocation |
-
----
-
-## 7. End-to-End Workflow
-
-1. Owner creates `Agent-01` and sets a balance, per-transaction limit, daily limit, and approved merchants.
-2. Agent performs a task and decides that it needs to make a payment.
-3. Agent sends a request to `POST /payments` containing `agent_id`, `merchant_id`, `amount`, and a unique `request_id`.
-4. Policy Server loads the agent and policy from SQLite.
-5. Server rejects immediately if the agent status is `FROZEN`.
-6. Server verifies the merchant is allowlisted.
-7. Server checks the per-transaction amount.
-8. Server calculates today's approved/settled spend and checks the daily limit.
-9. _Optional_: Server checks transaction velocity and duplicate request IDs.
-10. If all checks pass, the server calls the Payment Executor.
-11. Payment Executor debits the simulated wallet (or sandbox provider) and records success.
-12. Dashboard updates the transaction feed and remaining daily allowance.
-13. If the owner presses **FREEZE**, the status changes to `FROZEN` and future requests are rejected independently of the agent.
+| Attack | Status | Explanation |
+| :--- | :--- | :--- |
+| Prompt Injection | ✅ Mitigated | Server-side policy checks override prompt-based instructions. |
+| Replay Attack | ✅ Mitigated | Unique request identifiers and duplicate detection reduce replay risk. |
+| Overspending | ✅ Mitigated | Hard per-transaction and daily spend ceilings are enforced. |
+| Unknown Merchant | ✅ Mitigated | Allowlist enforcement blocks unapproved counterparties. |
+| Split Payments | ✅ Mitigated | Policy checks can detect attempts to bypass limits through fragmentation. |
+| Frozen Agent | ✅ Mitigated | The kill switch rejects all future requests when the agent is frozen. |
+| Velocity Attack | ✅ Mitigated | Rate and repeat-pattern logic can be applied to suspicious request bursts. |
+| Duplicate Requests | ✅ Mitigated | Requests are logged and validated to prevent accidental or repeated execution. |
 
 ---
 
-## 8. Suggested Folder Structure
+## Technology Stack
+
+| Category | Technology |
+| :--- | :--- |
+| Frontend | React + Vite |
+| Backend | FastAPI |
+| Auth | Firebase Authentication |
+| Data Layer | Firebase Firestore / backend services |
+| Language | Python + JavaScript |
+| Deployment | Render / Vercel-friendly architecture |
+
+---
+
+## Folder Structure
 
 ```text
-agentpay-guard/
+AgentPay-Guard/
 ├── backend/
-│   ├── main.py          # FastAPI Server
-│   ├── policy.py        # Policy evaluation logic
-│   ├── payments.py      # Payment Executor & Simulated Wallet
-│   ├── database.py      # DB session initialization
-│   └── models.py        # SQLAlchemy Models
-├── agent/
-│   ├── agent.py         # Autonomous agent runner / logic loop
-│   └── scenarios.py     # Attack demo script / test scenarios
-├── dashboard/
-│   └── app.py           # Streamlit Web App (Owner Control)
-├── tests/
-│   └── test_policy.py   # Pytest suite for verification
-├── data/
-│   └── agentpay.db      # SQLite DB (local gitignored)
-├── requirements.txt
-└── README.md
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── endpoints/
+│   │   │   └── ...
+│   │   ├── core/
+│   │   ├── db/
+│   │   ├── models/
+│   │   └── services/
+│   ├── data/
+│   ├── requirements.txt
+│   ├── Procfile
+│   └── render.yaml
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   ├── vite.config.js
+│   └── vercel.json
+├── README.md
+└── backend/firebase-key.json
 ```
 
 ---
 
-## 9. Suggested Data Model
+## API Reference
 
-- **`agents`**: `id`, `name`, `status` (ACTIVE/FROZEN), `balance`, `per_tx_limit`, `daily_limit`, `created_at`
-- **`merchants`**: `id`, `display_name`, `destination_reference`, `active`
-- **`agent_allowlist`**: `agent_id`, `merchant_id`
-- **`payment_requests`**: `request_id`, `agent_id`, `merchant_id`, `amount`, `status`, `reason`, `created_at`
-- **`transactions`**: `id`, `request_id`, `amount`, `balance_before`, `balance_after`, `settled_at`
-- **`audit_events`**: `id`, `actor`, `event_type`, `details`, `timestamp`
+| Method | Endpoint | Purpose |
+| :--- | :--- | :--- |
+| POST | /api/v1/payments | Submit a payment request from an agent. |
+| POST | /api/v1/agents/{id}/freeze | Freeze an agent immediately. |
+| POST | /api/v1/agents/{id}/unfreeze | Re-enable an agent. |
+| PUT | /api/v1/agents/{id}/policy | Update spend limits and policy settings. |
+| POST | /api/v1/agents/{id}/allowlist | Add an approved merchant. |
+| DELETE | /api/v1/agents/{id}/allowlist/{merchant} | Remove a merchant from the allowlist. |
+| GET | /api/v1/agents/{id} | Retrieve agent status and policy details. |
+| GET | /api/v1/agents/{id}/transactions | Load transaction history. |
 
----
-
-## 10. API Design
-
-| Method     | Endpoint                            | Purpose                                 |
-| :--------- | :---------------------------------- | :-------------------------------------- |
-| **POST**   | `/payments`                         | Agent requests a payment.               |
-| **POST**   | `/agents/{id}/freeze`               | Owner freezes an agent.                 |
-| **POST**   | `/agents/{id}/unfreeze`             | Owner re-enables an agent.              |
-| **PUT**    | `/agents/{id}/policy`               | Owner changes spend limits.             |
-| **POST**   | `/agents/{id}/allowlist`            | Owner adds an approved merchant.        |
-| **DELETE** | `/agents/{id}/allowlist/{merchant}` | Owner removes a merchant.               |
-| **GET**    | `/agents/{id}`                      | Dashboard gets agent status and limits. |
-| **GET**    | `/agents/{id}/transactions`         | Dashboard loads activity history.       |
+Interactive API docs are available at `/docs` when the backend is running.
 
 ---
 
-## 11. Security Rules
+## Installation
 
-- **Never** place payment-provider secrets in the agent code, prompt, browser, or repository.
-- **Separate** agent endpoints from owner/admin endpoints.
-- **Require** an owner/admin authentication mechanism for policy changes and freeze/unfreezes.
-- **Use** unique request IDs to prevent accidental/replayed duplicate payments.
-- **Perform** policy checks and payment execution server-side.
-- **Log** every approved and rejected request with a reason.
-- **Recheck** critical state immediately before executing delayed payments.
+### 1. Clone the repository
 
----
+```bash
+git clone <repository-url>
+cd AgentPay-Guard
+```
 
-## 12. Build Plan
-
-1.  **Core Policy**: Backend + simulated wallet. Done when: Valid payment succeeds; invalid amount fails.
-2.  **Allowlist**: Merchant restrictions. Done when: Unknown merchant is blocked.
-3.  **Kill Switch**: Freeze/unfreeze. Done when: Agent requests fail while frozen.
-4.  **Dashboard**: Human controls + visibility. Done when: Limits/status/logs update from UI.
-5.  **Attack Demo**: Automated scenarios. Done when: Overspend, unknown merchant, split-payments, and post-freeze actions all fail correctly.
-6.  **Optional AI**: LLM chooses/requests actions. Done when: Agent can operate autonomously without manual per-payment approval.
-
-## How to Run the Project
-
-Follow these steps to set up and launch both the backend service and the frontend dashboard on your local machine.
-
-### 1. Run Backend Service
-
-First, navigate to the `backend` directory:
+### 2. Set up the backend
 
 ```bash
 cd backend
+python -m venv venv
 ```
 
-Initialize the Python environment:
+Activate the environment:
 
 ```bash
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-# On Windows:
+# Windows (PowerShell)
 venv\Scripts\Activate.ps1
-# On macOS/Linux:
+
+# macOS / Linux
 source venv/bin/activate
 ```
 
-Install the required Python dependencies:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Launch the FastAPI backend server:
+Run the backend:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The backend API documentation will be available at `http://127.0.0.1:8000/docs`
+The API will be available at http://127.0.0.1:8000/docs.
 
-### 2. Run Frontend Dashboard
-
-Open a separate terminal window and navigate to the `frontend` directory:
+### 3. Set up the frontend
 
 ```bash
-cd frontend
-```
-
-Install the node package dependencies:
-
-```bash
+cd ../frontend
 npm install
-```
-
-Start the Vite development server:
-
-```bash
 npm run dev
 ```
 
-The frontend dashboard interface will be running locally at `http://localhost:5173/`
+The frontend will be available at http://localhost:5173/.
+
+---
+
+## Project Screenshots
+
+Placeholder assets for future documentation and demos:
+
+- assets/dashboard.png
+- assets/payment-flow.png
+- assets/architecture.png
+
+---
+
+## Security Highlights
+
+- [x] AI never owns the payment credential path
+- [x] Independent policy validation runs before execution
+- [x] Merchant allowlisting blocks unauthorized counterparties
+- [x] Replay protection and request tracking are part of the design
+- [x] Daily and per-transaction spending limits are enforced
+- [x] Kill switch support enables rapid freeze behavior
+- [x] Full audit logging supports incident review
+
+---
+
+## Attack Demonstrations
+
+| Scenario | Expected Result |
+| :--- | :--- |
+| Prompt tries to raise the daily limit | Request is denied by policy validation. |
+| Agent attempts a payment to an unknown merchant | The payment is blocked. |
+| Overspend attempt after limit is reached | The request fails before execution. |
+| Agent is frozen and then asked to pay | The request is rejected immediately. |
+| Duplicate payment request arrives twice | The second request is detected and blocked. |
