@@ -13,14 +13,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
 
-from app.api.auth_deps import RequireAdmin, get_current_user
 from app.api.crud_schemas import (
     AllowlistAdd,
     AllowlistEntryResponse,
     AllowlistResponse,
 )
 from app.db.session import get_session
-from app.models.user import User
 from app.services import agent_service, allowlist_service, merchant_service
 
 logger = logging.getLogger(__name__)
@@ -44,10 +42,9 @@ router = APIRouter(tags=["allowlist"])
 async def list_entries(
     agent_id: str,
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> AllowlistResponse:
     """List allowlist entries for an agent."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
@@ -88,22 +85,43 @@ async def add_entry(
     agent_id: str,
     body: AllowlistAdd,
     session = Depends(get_session),
-    user: User = Depends(RequireAdmin),
 ) -> AllowlistEntryResponse:
     """Add a merchant to an agent's allowlist."""
     # Validate agent exists
-    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
-    # Validate merchant exists
-    merchant = await merchant_service.get_merchant_by_id(session, body.merchant_id)
+    # Validate merchant exists or create dynamically
+    merchant = None
+    if body.merchant_id is not None:
+        merchant = await merchant_service.get_merchant_by_id(session, body.merchant_id)
+
     if merchant is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Merchant not found.")
+        if not body.display_name or not body.destination_reference:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Merchant not found, and display_name or destination_reference was not provided."
+            )
+        
+        # Check if a merchant with the same destination address already exists to avoid duplicates
+        all_merchants, _ = await merchant_service.list_merchants(session, limit=1000)
+        target_addr = body.destination_reference.strip().lower()
+        for m in all_merchants:
+            if m.destination_reference.strip().lower() == target_addr:
+                merchant = m
+                break
+        
+        if merchant is None:
+            merchant = await merchant_service.create_merchant(
+                session,
+                display_name=body.display_name,
+                destination_reference=body.destination_reference
+            )
 
     # Check it's not already on the list
     existing = await allowlist_service.get_allowlist_entry(
-        session, agent.id, body.merchant_id,
+        session, agent.id, merchant.id,
     )
 
     if existing is not None:
@@ -140,10 +158,9 @@ async def remove_entry(
     agent_id: str,
     merchant_id: int,
     session = Depends(get_session),
-    user: User = Depends(RequireAdmin),
 ) -> None:
     """Remove a merchant from an agent's allowlist."""
-    agent = await agent_service.get_agent_by_identifier(session, agent_id, user_id=user.id)
+    agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
         

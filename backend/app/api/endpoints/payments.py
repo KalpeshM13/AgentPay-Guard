@@ -94,16 +94,14 @@ async def request_payment(
 
     decision: PolicyDecision = await evaluate(ctx)
 
-    # ── 4. Handle BLOCKED ──────────────────────────────────────────────
-    user_id = getattr(agent, "user_id", None) if agent is not None else None
 
     if not decision.approved:
         # DUPLICATE_REQUEST is a special case — the original PaymentRequest
         # already exists with that request_id, so we only write an audit log.
         if decision.reason == 'DUPLICATE_REQUEST':
-            await _record_duplicate_blocked(session, body, user_id)
+            await _record_duplicate_blocked(session, body)
         else:
-            await _record_blocked(session, body, decision.reason or "UNKNOWN", user_id)
+            await _record_blocked(session, body, decision.reason or "UNKNOWN")
         return PaymentResponse(
             request_id=body.request_id,
             status="BLOCKED",
@@ -141,7 +139,6 @@ async def request_payment(
 async def _record_duplicate_blocked(
     session,
     body: PaymentRequestSchema,
-    user_id: int | None = None,
 ) -> None:
     """Log a duplicate-request block (no new PaymentRequest — already exists)."""
     import json
@@ -154,7 +151,6 @@ async def _record_duplicate_blocked(
         id=audit_id,
         actor=f"agent:{body.agent_id}",
         event_type=AuditEventType.PAYMENT_BLOCKED.value,
-        user_id=user_id,
         details=json.dumps({
             "request_id": body.request_id,
             "agent_id": body.agent_id,
@@ -172,7 +168,6 @@ async def _record_blocked(
     session: any,
     body: PaymentRequestSchema,
     reason: str,
-    user_id: int | None = None,
 ) -> None:
     """Persist a BLOCKED PaymentRequest + AuditLog in Firestore (fire-and-forget)."""
     import json
@@ -191,7 +186,6 @@ async def _record_blocked(
             id=pr_id,
             request_id=body.request_id,
             agent_id=body.agent_id,
-            user_id=user_id,
             merchant_id=body.merchant_id,
             amount=body.amount,
             status="BLOCKED",
@@ -205,7 +199,6 @@ async def _record_blocked(
         id=audit_id,
         actor=f"agent:{body.agent_id}",
         event_type=AuditEventType.PAYMENT_BLOCKED.value,
-        user_id=user_id,
         details=json.dumps({
             "request_id": body.request_id,
             "agent_id": body.agent_id,

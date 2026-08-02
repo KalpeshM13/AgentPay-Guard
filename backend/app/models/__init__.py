@@ -9,7 +9,6 @@ from app.models.audit_log import AuditLog
 from app.models.merchant import Merchant
 from app.models.payment_request import PaymentRequest
 from app.models.transaction import Transaction
-from app.models.user import User
 
 __all__ = [
     "Agent",
@@ -18,5 +17,4 @@ __all__ = [
     "Merchant",
     "PaymentRequest",
     "Transaction",
-    "User",
 ]

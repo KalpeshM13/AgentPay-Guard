@@ -42,21 +42,52 @@ async def execute(
             f"Insufficient balance: need {amount}, have {agent.balance}"
         )
 
-    # Load and deduct from the user's balance
-    user_id = getattr(agent, "user_id", None)
-    if user_id is not None:
-        user_data = await session.get("users", user_id)
-        if user_data:
-            user_balance = float(user_data.get("balance", 10.0))
-            if amount > user_balance:
-                raise ValueError(
-                    f"Insufficient user balance: need {amount}, have {user_balance}"
-                )
-            user_data["balance"] = max(0.0, user_balance - amount)
-            await session.update("users", user_id, user_data)
-
     balance_before = agent.balance
-    agent.balance -= amount
+
+    # Resolve target address if blockchain is enabled
+    tx_hash = None
+    from app.core.config import settings
+    if settings.IS_BLOCKCHAIN_ENABLED:
+        from app.services.chain import execute_on_chain_payment
+        merchant_data = await session.get("merchants", merchant_id)
+        if not merchant_data:
+            raise ValueError(f"Merchant not found: {merchant_id}")
+        
+        dest_ref = merchant_data.get("destination_reference", "")
+        # Default mock addresses mapping
+        MOCK_MAP = {
+            "compute_provider": "0x1111111111111111111111111111111111111111",
+            "api_provider": "0x2222222222222222222222222222222222222222",
+            "vendor_a": "0x3333333333333333333333333333333333333333",
+            "aws_demo": "0x4444444444444444444444444444444444444444",
+        }
+        
+        target_addr = None
+        if dest_ref.startswith("0x") and len(dest_ref) == 42:
+            target_addr = dest_ref
+        elif dest_ref in MOCK_MAP:
+            target_addr = MOCK_MAP[dest_ref]
+        else:
+            cleaned = dest_ref.strip()
+            if len(cleaned) == 40 and all(c in "0123456789abcdefABCDEF" for c in cleaned):
+                target_addr = "0x" + cleaned
+            else:
+                target_addr = f"0x{merchant_id:040x}"
+                
+        try:
+            tx_hash = await execute_on_chain_payment(target_addr, amount)
+            # Fetch and sync the actual updated balance from the blockchain
+            from app.services.chain import check_on_chain_status
+            status_info = await check_on_chain_status()
+            if status_info.get("status") == "connected":
+                agent.balance = status_info.get("balance_eth", agent.balance)
+        except Exception as e:
+            logger.error(f"On-chain execution failed: {e}")
+            raise RuntimeError(f"On-chain payment execution failed: {e}")
+    else:
+        agent.balance -= amount
+
+
 
     # Get auto-incrementing integer IDs atomically
     pr_id = await session.get_next_id("payment_requests")
@@ -68,30 +99,29 @@ async def execute(
         id=pr_id,
         request_id=request_id,
         agent_id=agent.id,
-        user_id=user_id,
         merchant_id=merchant_id,
         amount=amount,
         status="SETTLED",
         reason=None,
         created_at=datetime.now(timezone.utc),
+        tx_hash=tx_hash
     )
 
     transaction = Transaction(
         id=tx_id,
         request_id=request_id,
         agent_id=agent.id,
-        user_id=user_id,
         amount=amount,
         balance_before=balance_before,
         balance_after=agent.balance,
         settled_at=datetime.now(timezone.utc),
+        tx_hash=tx_hash
     )
 
     audit = AuditLog(
         id=audit_id,
         actor=f"agent:{agent.id}",
         event_type=AuditEventType.PAYMENT_SETTLED.value,
-        user_id=user_id,
         details=json.dumps({
             "request_id": request_id,
             "agent_id": agent.id,

@@ -23,6 +23,21 @@ import {
   Moon,
 } from "lucide-react";
 import * as api from "./api";
+import { ethers } from "ethers";
+
+const CONTRACT_ADDRESS = import.meta.env.VITE_SMART_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+const WALLET_ABI = [
+  "function freeze() external",
+  "function unfreeze() external",
+  "function setLimits(uint256 perTx, uint256 period) external",
+  "function setAllowedTarget(address target, bool allowed) external",
+  "function frozen() external view returns (bool)",
+  "function perTxLimit() external view returns (uint256)",
+  "function periodLimit() external view returns (uint256)",
+  "function spentThisPeriod() external view returns (uint256)",
+  "function allowedTargets(address) external view returns (bool)"
+];
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState("dashboard");
@@ -44,6 +59,57 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // MetaMask Real Wallet integration
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [walletBalance, setWalletBalance] = useState("0");
+
+  const checkConnection = async () => {
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.listAccounts();
+        if (accounts.length > 0) {
+          const address = await accounts[0].getAddress();
+          setWalletAddress(address);
+          localStorage.setItem("walletAddress", address);
+          const balance = await provider.getBalance(address);
+          setWalletBalance(ethers.formatEther(balance));
+        }
+      } catch (err) {
+        console.error("Failed to check MetaMask connection status:", err);
+      }
+    }
+  };
+
+  const connectWallet = async () => {
+    if (!window.ethereum) {
+      alert("MetaMask is not installed. Please install it to use on-chain features.");
+      return;
+    }
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.send("eth_requestAccounts", []);
+      const address = accounts[0];
+      setWalletAddress(address);
+      localStorage.setItem("walletAddress", address);
+      
+      const balance = await provider.getBalance(address);
+      setWalletBalance(ethers.formatEther(balance));
+      addLog("info", `METAMASK: Connected account ${address}`);
+    } catch (err) {
+      console.error(err);
+      addLog("error", `METAMASK ERROR: ${err.message}`);
+    }
+  };
+
+  const getContractInstance = async () => {
+    if (!window.ethereum) throw new Error("MetaMask is not installed.");
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const addressToUse = agent?.smart_contract_address || CONTRACT_ADDRESS;
+    return new ethers.Contract(addressToUse, WALLET_ABI, signer);
+  };
 
   // Metamask transaction signature simulation state
   const [signingTx, setSigningTx] = useState(null);
@@ -82,50 +148,65 @@ export default function App() {
   // Load user profile and their agents list on mount
   const loadUserProfileAndAgents = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
-      const [profile, agentsList] = await Promise.all([
-        api.getMe(),
-        api.getAgents(),
-      ]);
-      setCurrentUser(profile);
+      const agentsList = await api.getAgents();
+      setCurrentUser({ display_name: "Admin Owner", role: "OWNER" });
       setUserAgents(agentsList.agents || []);
 
       if (agentsList.agents && agentsList.agents.length > 0) {
         setSelectedAgentId(agentsList.agents[0].id);
       } else {
-        setError("No agents configured for this account.");
-        setLoading(false);
+        setSelectedAgentId("1");
       }
     } catch (err) {
-      console.error("Auth error:", err);
-      localStorage.removeItem("token");
-      navigate("/login");
+      console.error("Fetch profile/agents error, using defaults:", err);
+      setCurrentUser({ display_name: "Admin Owner", role: "OWNER" });
+      setSelectedAgentId("1");
+    }
+
+    // Prompt MetaMask connection if not already connected
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.listAccounts();
+        if (accounts.length > 0) {
+          const address = await accounts[0].getAddress();
+          setWalletAddress(address);
+          const balance = await provider.getBalance(address);
+          setWalletBalance(ethers.formatEther(balance));
+        }
+      } catch (err) {
+        console.error("Failed to check MetaMask connection:", err);
+      }
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
+    setWalletAddress(null);
+    setWalletBalance("0");
+    localStorage.removeItem("walletAddress");
+    addLog("info", "METAMASK: Disconnected wallet");
   };
 
   // Load agent data and transaction history
   const fetchData = async () => {
     if (!selectedAgentId) return;
     try {
-      const [agentData, txData, profile] = await Promise.all([
+      const [agentData, txData] = await Promise.all([
         api.getAgent(selectedAgentId),
         api.getTransactions(selectedAgentId),
-        api.getMe(),
       ]);
 
       setAgent(agentData);
       setTransactions(txData);
-      setCurrentUser(profile);
+      setCurrentUser({ display_name: "Admin Owner", role: "OWNER" });
       setError(null);
+
+      // Auto update MetaMask balance on every fetch poll
+      if (window.ethereum && walletAddress) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const balance = await provider.getBalance(walletAddress);
+        setWalletBalance(ethers.formatEther(balance));
+      }
     } catch (err) {
       console.error(err);
       setError("Could not retrieve agent details or transactions.");
@@ -136,7 +217,39 @@ export default function App() {
 
   useEffect(() => {
     loadUserProfileAndAgents();
-  }, []);
+    checkConnection();
+
+    // Listen to account changes dynamically
+    if (window.ethereum) {
+      const handleAccounts = async (accounts) => {
+        if (accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          localStorage.setItem("walletAddress", accounts[0]);
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const balance = await provider.getBalance(accounts[0]);
+          setWalletBalance(ethers.formatEther(balance));
+        } else {
+          setWalletAddress(null);
+          localStorage.removeItem("walletAddress");
+          setWalletBalance("0");
+        }
+      };
+
+      const handleChain = () => {
+        window.location.reload();
+      };
+
+      window.ethereum.on("accountsChanged", handleAccounts);
+      window.ethereum.on("chainChanged", handleChain);
+
+      return () => {
+        if (window.ethereum.removeListener) {
+          window.ethereum.removeListener("accountsChanged", handleAccounts);
+          window.ethereum.removeListener("chainChanged", handleChain);
+        }
+      };
+    }
+  }, [walletAddress]);
 
   useEffect(() => {
     if (selectedAgentId) {
@@ -144,7 +257,7 @@ export default function App() {
       const interval = setInterval(fetchData, 5000);
       return () => clearInterval(interval);
     }
-  }, [selectedAgentId]);
+  }, [selectedAgentId, walletAddress]);
 
   // Scroll to bottom of console simulator
   useEffect(() => {
@@ -161,39 +274,27 @@ export default function App() {
   };
 
   // Metamask Simulation triggers
-  const triggerOnChainTx = (actionType, title, details, executionCallback) => {
+  const triggerOnChainTx = async (actionType, title, details, executionCallback) => {
     setSigningTx({
       action: actionType,
       title: title,
       details: details,
       callback: executionCallback,
     });
-    setSigningProgress("prompt");
-  };
-
-  const handleConfirmSignature = async () => {
-    if (!signingTx) return;
     setSigningProgress("broadcasting");
-
-    // Simulate chain block confirmation delay
-    setTimeout(async () => {
-      try {
-        await signingTx.callback();
-        setSigningProgress("success");
-        setTimeout(() => {
-          setSigningTx(null);
-          fetchData();
-        }, 1000);
-      } catch (err) {
-        addLog("error", `TRANSACTION REVERTED: ${err.message}`);
+    try {
+      addLog("info", `METAMASK: Requesting signature for ${title}...`);
+      await executionCallback();
+      setSigningProgress("success");
+      setTimeout(() => {
         setSigningTx(null);
-      }
-    }, 1500);
-  };
-
-  const handleRejectSignature = () => {
-    addLog("warn", `OWNER ACTION: Signature request rejected by user.`);
-    setSigningTx(null);
+        fetchData();
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      addLog("error", `TRANSACTION FAILED: ${err.message}`);
+      setSigningTx(null);
+    }
   };
 
   // API Action handlers wrapped in signature simulator
@@ -205,23 +306,31 @@ export default function App() {
       isFreezing ? "freeze" : "unfreeze",
       isFreezing ? "Emergency Freeze contract" : "Unfreeze contract",
       {
-        Contract: "AgentGuardWallet (0x47B2...d91C)",
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: isFreezing ? "freeze()" : "unfreeze()",
         "Gas Limit": "45,000 gas",
         Value: "0 ETH",
       },
       async () => {
-        if (isFreezing) {
-          addLog("warn", "OWNER ACTION: Initiated Emergency Freeze on-chain.");
-          await api.freezeAgent(selectedAgentId);
-          addLog(
-            "error",
-            "SYSTEM: Wallet status set to FROZEN. On-chain authority revoked.",
-          );
-        } else {
-          addLog("info", "OWNER ACTION: Initiated Wallet Unfreeze on-chain.");
-          await api.unfreezeAgent(selectedAgentId);
-          addLog("success", "SYSTEM: Wallet status restored to ACTIVE.");
+        try {
+          addLog("info", `OWNER ACTION: Sending transaction on-chain via MetaMask...`);
+          const contract = await getContractInstance();
+          const tx = isFreezing ? await contract.freeze() : await contract.unfreeze();
+          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          await tx.wait();
+
+          if (isFreezing) {
+            await api.freezeAgent(selectedAgentId);
+            addLog(
+              "error",
+              "SYSTEM: Wallet status set to FROZEN. On-chain authority revoked.",
+            );
+          } else {
+            await api.unfreezeAgent(selectedAgentId);
+            addLog("success", "SYSTEM: Wallet status restored to ACTIVE.");
+          }
+        } catch (err) {
+          throw new Error(err.reason || err.message);
         }
       },
     );
@@ -233,22 +342,30 @@ export default function App() {
       "policy",
       "Set Wallet Limits",
       {
-        Contract: "AgentGuardWallet (0x47B2...d91C)",
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: "setLimits(uint256, uint256)",
         "Per-Tx Limit": `${limitPerTx} ETH`,
         "Daily Limit": `${limitDaily} ETH`,
       },
       async () => {
-        addLog(
-          "info",
-          `OWNER ACTION: Updating limits (Per Tx: ${limitPerTx} ETH, Daily: ${limitDaily} ETH)`,
-        );
-        await api.updatePolicy(selectedAgentId, limitPerTx, limitDaily);
-        addLog(
-          "success",
-          "SYSTEM: Spending limit policies updated successfully.",
-        );
-        setShowLimitsModal(false);
+        try {
+          addLog("info", `OWNER ACTION: Updating limits on-chain...`);
+          const contract = await getContractInstance();
+          const perTxWei = ethers.parseEther(limitPerTx);
+          const dailyWei = ethers.parseEther(limitDaily);
+          const tx = await contract.setLimits(perTxWei, dailyWei);
+          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          await tx.wait();
+
+          await api.updatePolicy(selectedAgentId, limitPerTx, limitDaily);
+          addLog(
+            "success",
+            "SYSTEM: Spending limit policies updated successfully.",
+          );
+          setShowLimitsModal(false);
+        } catch (err) {
+          throw new Error(err.reason || err.message);
+        }
       },
     );
   };
@@ -267,50 +384,75 @@ export default function App() {
         .toString(16)
         .padStart(40, "0")}`;
 
+    if (!ethers.isAddress(mAddress)) {
+      alert("Invalid Ethereum Address! The Destination Address Reference must be a valid Ethereum address starting with 0x (e.g., 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266).");
+      return;
+    }
+
     triggerOnChainTx(
       "allowlist_add",
       "Add Approved Target",
       {
-        Contract: "AgentGuardWallet (0x47B2...d91C)",
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: "setAllowedTarget(address, bool)",
         "Merchant ID": mId,
         "Merchant Name": mName,
         "Address Reference": mAddress,
       },
       async () => {
-        addLog(
-          "info",
-          `OWNER ACTION: Allowlisting merchant "${mName}" (${mId})`,
-        );
-        await api.addToAllowlist(selectedAgentId, mId, mName, mAddress);
-        addLog("success", `SYSTEM: Merchant "${mName}" allowlisted on-chain.`);
-        setNewMerchantId("");
-        setNewMerchantName("");
-        setNewMerchantAddress("");
+        try {
+          addLog("info", `OWNER ACTION: Allowlisting merchant address "${mAddress}" on-chain...`);
+          const contract = await getContractInstance();
+          const tx = await contract.setAllowedTarget(mAddress, true);
+          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          await tx.wait();
+
+          await api.addToAllowlist(selectedAgentId, mId, mName, mAddress);
+          addLog("success", `SYSTEM: Merchant "${mName}" allowlisted on-chain.`);
+          setNewMerchantId("");
+          setNewMerchantName("");
+          setNewMerchantAddress("");
+        } catch (err) {
+          throw new Error(err.reason || err.message);
+        }
       },
     );
   };
 
   const handleRemoveFromAllowlist = (merchantId, displayName) => {
+    const entry = agent?.allowlist?.find(m => m.merchant_id === merchantId || m.id === merchantId);
+    const mAddress = entry ? entry.destination_reference : null;
+
+    if (!mAddress) {
+      addLog("error", `ERROR: Could not find address for merchant ID: ${merchantId}`);
+      return;
+    }
+
     triggerOnChainTx(
       "allowlist_remove",
       "Revoke Approved Target",
       {
-        Contract: "AgentGuardWallet (0x47B2...d91C)",
+        Contract: `AgentGuardWallet (${CONTRACT_ADDRESS.substring(0, 6)}...${CONTRACT_ADDRESS.substring(CONTRACT_ADDRESS.length - 4)})`,
         Action: "setAllowedTarget(address, bool)",
         "Merchant ID": merchantId,
         Status: "FALSE (Revoke)",
       },
       async () => {
-        addLog(
-          "warn",
-          `OWNER ACTION: Revoking allowlist authorization for "${displayName || merchantId}"`,
-        );
-        await api.removeFromAllowlist(selectedAgentId, merchantId);
-        addLog(
-          "success",
-          `SYSTEM: Merchant "${merchantId}" removed from allowlist.`,
-        );
+        try {
+          addLog("warn", `OWNER ACTION: Revoking allowlist authorization for "${displayName || merchantId}" on-chain...`);
+          const contract = await getContractInstance();
+          const tx = await contract.setAllowedTarget(mAddress, false);
+          addLog("info", `ON-CHAIN TX SENT: Waiting for confirmation... Hash: ${tx.hash}`);
+          await tx.wait();
+
+          await api.removeFromAllowlist(selectedAgentId, merchantId);
+          addLog(
+            "success",
+            `SYSTEM: Merchant "${merchantId}" removed from allowlist.`,
+          );
+        } catch (err) {
+          throw new Error(err.reason || err.message);
+        }
       },
     );
   };
@@ -376,6 +518,102 @@ export default function App() {
     }
     setShowLimitsModal(true);
   };
+
+  if (!walletAddress) {
+    return (
+      <div
+        className="connect-wallet-container"
+        style={{
+          display: "flex",
+          height: "100vh",
+          width: "100vw",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          gap: "1.5rem",
+          backgroundColor: "#0d0e12",
+          color: "#ffffff",
+          fontFamily: "var(--font-sans)",
+          textAlign: "center",
+          padding: "2rem",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {/* Glowing background shapes */}
+        <div style={{
+          position: "absolute",
+          top: "10%",
+          left: "20%",
+          width: "300px",
+          height: "300px",
+          backgroundColor: "rgba(99, 102, 241, 0.15)",
+          borderRadius: "50%",
+          filter: "blur(80px)",
+          zIndex: 0
+        }} />
+        <div style={{
+          position: "absolute",
+          bottom: "10%",
+          right: "20%",
+          width: "300px",
+          height: "300px",
+          backgroundColor: "rgba(244, 63, 94, 0.1)",
+          borderRadius: "50%",
+          filter: "blur(80px)",
+          zIndex: 0
+        }} />
+
+        <div style={{ zIndex: 1, maxWidth: "450px" }}>
+          {/* Orange Fox Glow / Shield icon */}
+          <div style={{ 
+            display: "inline-flex", 
+            padding: "1.25rem", 
+            borderRadius: "24px", 
+            backgroundColor: "rgba(249, 115, 22, 0.1)", 
+            border: "1px solid rgba(249, 115, 22, 0.2)",
+            marginBottom: "1.5rem",
+            boxShadow: "0 0 30px rgba(249, 115, 22, 0.1)"
+          }}>
+            <Shield size={64} style={{ color: "#f97316" }} />
+          </div>
+
+          <h1 style={{ fontSize: "2.2rem", fontWeight: "800", marginBottom: "0.5rem", letterSpacing: "-0.5px" }}>
+            AGENTPAY GUARD
+          </h1>
+          <p style={{ color: "#9ca3af", fontSize: "0.95rem", marginBottom: "2rem", lineHeight: "1.5" }}>
+            Secure AI agent spending with on-chain control policies. Connect your MetaMask owner wallet to authorize and monitor transactions.
+          </p>
+
+          <button
+            onClick={connectWallet}
+            style={{
+              padding: "0.8rem 2rem",
+              backgroundColor: "#f97316",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "12px",
+              fontSize: "1rem",
+              fontWeight: "600",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(249, 115, 22, 0.4)",
+              transition: "transform 0.2s, background-color 0.2s"
+            }}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = "#ea580c";
+              e.target.style.transform = "translateY(-1px)";
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = "#f97316";
+              e.target.style.transform = "none";
+            }}
+          >
+            Connect MetaMask Wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !agent) {
     return (
@@ -454,49 +692,7 @@ export default function App() {
             </div>
           </div>
 
-          {userAgents.length > 0 && (
-            <div
-              style={{
-                padding: "0 1.5rem 1rem",
-                borderBottom: "1px solid var(--border-color)",
-              }}
-            >
-              <label
-                style={{
-                  fontSize: "0.75rem",
-                  textTransform: "uppercase",
-                  color: "var(--text-secondary)",
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                Active Agent
-              </label>
-              <select
-                value={selectedAgentId || ""}
-                onChange={(e) => setSelectedAgentId(parseInt(e.target.value))}
-                style={{
-                  width: "100%",
-                  padding: "0.6rem 0.75rem",
-                  backgroundColor: "var(--bg-tertiary)",
-                  color: "var(--text-primary)",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "8px",
-                  outline: "none",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: "0.9rem",
-                }}
-              >
-                {userAgents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+
 
           <nav
             className="sidebar-menu"
@@ -553,7 +749,7 @@ export default function App() {
             </button>
           </nav>
 
-          {currentUser && (
+          {walletAddress && (
             <div
               style={{
                 marginTop: "auto",
@@ -572,7 +768,7 @@ export default function App() {
                     color: "var(--text-primary)",
                   }}
                 >
-                  {currentUser.display_name}
+                  MetaMask Wallet
                 </div>
                 <div
                   style={{
@@ -582,7 +778,7 @@ export default function App() {
                     letterSpacing: "0.5px",
                   }}
                 >
-                  Role: {currentUser.role}
+                  Role: OWNER / ADMIN
                 </div>
               </div>
               <div
@@ -593,18 +789,31 @@ export default function App() {
                   borderRadius: "8px",
                   fontSize: "0.85rem",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  flexDirection: "column",
+                  gap: "0.5rem",
                 }}
               >
-                <span style={{ color: "var(--text-secondary)" }}>
-                  User Wallet:
-                </span>
-                <span
-                  style={{ fontWeight: "600", color: "var(--accent-primary)" }}
-                >
-                  {currentUser.balance?.toFixed(4) || "0.0000"} ETH
-                </span>
+                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    Wallet:
+                  </span>
+                  <span
+                    style={{ fontWeight: "600", color: "var(--accent-primary)", fontFamily: "monospace" }}
+                    title={walletAddress}
+                  >
+                    {walletAddress.substring(0, 6)}...{walletAddress.substring(walletAddress.length - 4)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    Balance:
+                  </span>
+                  <span
+                    style={{ fontWeight: "600", color: "var(--accent-primary)" }}
+                  >
+                    {parseFloat(walletBalance).toFixed(4)} ETH
+                  </span>
+                </div>
               </div>
               <button
                 onClick={handleLogout}
@@ -629,7 +838,7 @@ export default function App() {
                   e.target.style.color = "var(--accent-danger)";
                 }}
               >
-                Log Out
+                Disconnect Wallet
               </button>
             </div>
           )}
@@ -711,19 +920,19 @@ export default function App() {
               {/* Metrics Row */}
               <div className="metrics-row">
                 <div className="metric-box">
-                  <div className="metric-label">Agent ID</div>
+                  <div className="metric-label">Agent Name</div>
                   <div
                     className="metric-value"
                     style={{
                       fontSize: "1.1rem",
-                      fontFamily: "var(--font-mono)",
+                      fontWeight: "600",
                     }}
                   >
-                    {agent?.id || "N/A"}
+                    {agent?.name || "N/A"}
                   </div>
                 </div>
                 <div className="metric-box">
-                  <div className="metric-label">Wallet Balance</div>
+                  <div className="metric-label">Smart Wallet Balance</div>
                   <div
                     className="metric-value highlight"
                     style={{
@@ -799,8 +1008,8 @@ export default function App() {
                         >
                           Smart Wallet Contract
                         </span>
-                        <span className="info-value">
-                          0x47B2C240E91CaA8b456C8b28ef5aE91456CbD91C
+                        <span className="info-value" style={{ fontFamily: "monospace" }}>
+                          {CONTRACT_ADDRESS}
                         </span>
                       </div>
                       <div className="info-row">
@@ -812,8 +1021,8 @@ export default function App() {
                         >
                           Owner Wallet Address
                         </span>
-                        <span className="info-value">
-                          0x89e173aC402DeA29f128c772cba8eA9145CbE28d
+                        <span className="info-value" style={{ fontFamily: "monospace" }}>
+                          {walletAddress || "Not Connected (Click Connect MetaMask in sidebar)"}
                         </span>
                       </div>
                       <div className="info-row">
@@ -825,8 +1034,8 @@ export default function App() {
                         >
                           Authorized Agent Key
                         </span>
-                        <span className="info-value">
-                          0xFaC71A9c0bE2390bE23908b983aFa68c91456CbD
+                        <span className="info-value" style={{ fontFamily: "monospace" }}>
+                          0x70997970C51812dc3A010C7d01b50e0d17dc79C8
                         </span>
                       </div>
                       <div
@@ -851,7 +1060,7 @@ export default function App() {
                             fontWeight: "600",
                           }}
                         >
-                          Holesky Testnet (Ethereum compatible)
+                          Hardhat Local (Chain ID 31337)
                         </span>
                       </div>
                     </div>
@@ -1490,7 +1699,6 @@ export default function App() {
               )}
             </div>
           )}
-
           {/* --- SCREEN 4: LIVE AGENT CONSOLE & SIMULATOR --- */}
           {activeScreen === "console" && (
             <div
@@ -1877,154 +2085,54 @@ export default function App() {
 
         {/* --- METAMASK TRANSACTION SIGNATURE SIMULATOR --- */}
         {signingTx && (
-          <div className="metamask-simulator-overlay">
-            <div className="metamask-simulator-card">
-              <header className="metamask-header">
-                <div className="metamask-logo-container">
+          <div className="metamask-simulator-overlay" style={{ display: "flex", justifyContent: "center", alignItems: "center", position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2.5rem", borderRadius: "16px", backgroundColor: "#12131a", border: "1px solid var(--border-color)", maxWidth: "400px", width: "90%", gap: "1.5rem" }}>
+              {signingProgress === "broadcasting" && (
+                <>
+                  <RefreshCw
+                    size={48}
+                    style={{
+                      color: "var(--accent-primary)",
+                      animation: "spin 2s linear infinite",
+                    }}
+                  />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ color: "#ffffff", fontWeight: "bold", fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+                      MetaMask Request
+                    </div>
+                    <div style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                      Please confirm the transaction in your MetaMask wallet extension.
+                    </div>
+                  </div>
+                </>
+              )}
+              {signingProgress === "success" && (
+                <>
                   <div
                     style={{
-                      width: 24,
-                      height: 24,
+                      width: 56,
+                      height: 56,
                       borderRadius: "50%",
-                      background: "linear-gradient(135deg, #e27613, #f6851b)",
+                      backgroundColor: "rgba(16,185,129,0.1)",
+                      border: "2px solid var(--accent-success)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      color: "#fff",
+                      color: "var(--accent-success)",
                     }}
                   >
-                    🦊
+                    <Check size={32} />
                   </div>
-                  <span className="metamask-logo-text">MetaMask</span>
-                </div>
-                <div className="metamask-network-badge" style={{ margin: 0 }}>
-                  Holesky Testnet
-                </div>
-              </header>
-
-              <div className="metamask-body">
-                {signingProgress === "prompt" && (
-                  <>
-                    <div className="metamask-title">{signingTx.title}</div>
-                    <div className="metamask-desc">
-                      Sign this message to authorize the wallet change on the
-                      Ethereum blockchain.
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ color: "#ffffff", fontWeight: "bold", fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+                      Transaction Confirmed
                     </div>
-
-                    <div className="metamask-tx-details">
-                      {Object.entries(signingTx.details).map(([key, val]) => (
-                        <div className="metamask-tx-row" key={key}>
-                          <span className="metamask-tx-label">{key}</span>
-                          <span className="metamask-tx-value">{val}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="metamask-footer-actions">
-                      <button
-                        className="btn btn-secondary btn-metamask-reject"
-                        onClick={handleRejectSignature}
-                      >
-                        Reject
-                      </button>
-                      <button
-                        className="btn btn-primary btn-metamask-confirm"
-                        onClick={handleConfirmSignature}
-                      >
-                        Sign & Confirm
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {signingProgress === "broadcasting" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "2rem 0",
-                      gap: "1rem",
-                    }}
-                  >
-                    <RefreshCw
-                      size={32}
-                      className="animate-spin"
-                      style={{
-                        color: "#f6851b",
-                        animation: "spin 2s linear infinite",
-                      }}
-                    />
-                    <div
-                      style={{
-                        color: "#ffffff",
-                        fontWeight: "bold",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Broadcasting to Ledger...
-                    </div>
-                    <div
-                      style={{
-                        color: "var(--text-secondary)",
-                        fontSize: "0.8rem",
-                        textAlign: "center",
-                      }}
-                    >
-                      Waiting for transaction to be mined in block.
+                    <div style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                      On-chain parameters successfully updated.
                     </div>
                   </div>
-                )}
-
-                {signingProgress === "success" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "2rem 0",
-                      gap: "1rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        backgroundColor: "rgba(16,185,129,0.1)",
-                        border: "2px solid var(--accent-success)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--accent-success)",
-                      }}
-                    >
-                      <Check size={28} />
-                    </div>
-                    <div
-                      style={{
-                        color: "#ffffff",
-                        fontWeight: "bold",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Transaction Confirmed!
-                    </div>
-                    <div
-                      style={{
-                        color: "var(--text-secondary)",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      On-chain state successfully updated.
-                    </div>
-                  </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
           </div>
         )}

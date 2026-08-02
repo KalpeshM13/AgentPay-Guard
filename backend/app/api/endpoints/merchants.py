@@ -10,15 +10,12 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 
-
-from app.api.auth_deps import RequireAdmin, get_current_user
 from app.api.crud_schemas import (
     MerchantCreate,
     MerchantListResponse,
     MerchantResponse,
 )
 from app.db.session import get_session
-from app.models.user import User
 from app.services import merchant_service
 
 logger = logging.getLogger(__name__)
@@ -44,7 +41,6 @@ router = APIRouter(prefix="/merchants", tags=["merchants"])
 async def create(
     body: MerchantCreate,
     session = Depends(get_session),
-    user: User = Depends(RequireAdmin),
 ) -> MerchantResponse:
     """Create a merchant."""
     existing = await merchant_service.get_merchant_by_name(session, body.display_name)
@@ -80,7 +76,6 @@ async def list_all(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=200),
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> MerchantListResponse:
     """List merchants."""
     merchants, total = await merchant_service.list_merchants(
@@ -109,7 +104,6 @@ async def list_all(
 async def delete_one(
     merchant_id: int,
     session = Depends(get_session),
-    user: User = Depends(RequireAdmin),
 ) -> None:
     """Delete a merchant."""
     merchant = await merchant_service.get_merchant_by_id(session, merchant_id)

@@ -149,6 +149,12 @@ AgentPay-Guard/
 │   ├── package.json
 │   ├── vite.config.js
 │   └── vercel.json
+├── contracts/
+│   └── AgentPayGuard.sol
+├── scripts/
+│   └── deploy.js
+├── hardhat.config.js
+├── package.json
 ├── README.md
 └── backend/firebase-key.json
 ```
@@ -204,6 +210,17 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+Set up your environment variables:
+
+```bash
+cp .env.example .env
+```
+
+Make sure to review the `.env` file and configure any necessary keys (e.g., `OPENAI_API_KEY`).
+**Important**: If you see a `Failed to get firestore client: Your default credentials were not found` error, ensure that `FIREBASE_CREDENTIALS_PATH="firebase-key.json"` is set in your `.env` file and that the `firebase-key.json` file is present in the `backend/` directory.
+
+If you intend to use the Hardhat local node, ensure you set `IS_BLOCKCHAIN_ENABLED=true` in this file.
+
 Run the backend:
 
 ```bash
@@ -214,13 +231,34 @@ The API will be available at http://127.0.0.1:8000/docs.
 
 ### 3. Set up the frontend
 
+Run in New Terminal
+
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
 
 The frontend will be available at http://localhost:5173/.
+
+### 4. Set up the Blockchain (Hardhat)
+
+If blockchain features are enabled, you need to run a local Ethereum node and deploy the smart contract.
+
+Run in a New Terminal from the root directory:
+
+```bash
+npm install
+npx hardhat node
+```
+
+In another terminal, deploy the contracts to the local network:
+
+```bash
+npx hardhat run scripts/deploy.js --network localhost
+```
+
+The smart contract features will now be available for the backend to interact with.
 
 ---
 

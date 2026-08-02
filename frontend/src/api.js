@@ -3,68 +3,21 @@ const API_BASE_URL =
 
 function getHeaders(extraHeaders = {}) {
   const headers = { ...extraHeaders };
-  const token = localStorage.getItem("token");
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  const walletAddress = localStorage.getItem("walletAddress");
+  if (walletAddress) {
+    headers["X-Wallet-Address"] = walletAddress;
   }
   return headers;
 }
 
-export async function login(email, password) {
-  const formData = new URLSearchParams();
-  formData.append("username", email);
-  formData.append("password", password);
-
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: formData.toString(),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Invalid email or password");
-  }
-  return response.json();
+async function apiFetch(url, options = {}) {
+  const headers = getHeaders(options.headers);
+  return await fetch(url, { ...options, headers });
 }
 
-export async function register(email, password, displayName) {
-  const response = await fetch(`${API_BASE_URL}/auth/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-      display_name: displayName,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Registration failed");
-  }
-  return response.json();
-}
-
-export async function getMe() {
-  const response = await fetch(`${API_BASE_URL}/auth/me`, {
-    headers: getHeaders(),
-  });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to fetch user profile");
-  }
-  return response.json();
-}
 
 export async function getAgents() {
-  const response = await fetch(`${API_BASE_URL}/agents`, {
-    headers: getHeaders(),
-  });
+  const response = await apiFetch(`${API_BASE_URL}/agents`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || "Failed to fetch agents list");
@@ -73,9 +26,7 @@ export async function getAgents() {
 }
 
 export async function getAgent(id) {
-  const response = await fetch(`${API_BASE_URL}/agents/${id}`, {
-    headers: getHeaders(),
-  });
+  const response = await apiFetch(`${API_BASE_URL}/agents/${id}`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || "Failed to fetch agent details");
@@ -84,9 +35,7 @@ export async function getAgent(id) {
 }
 
 export async function getTransactions(id) {
-  const response = await fetch(`${API_BASE_URL}/agents/${id}/transactions`, {
-    headers: getHeaders(),
-  });
+  const response = await apiFetch(`${API_BASE_URL}/agents/${id}/transactions`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || "Failed to fetch transaction history");
@@ -95,9 +44,8 @@ export async function getTransactions(id) {
 }
 
 export async function freezeAgent(id) {
-  const response = await fetch(`${API_BASE_URL}/agents/${id}/freeze`, {
+  const response = await apiFetch(`${API_BASE_URL}/agents/${id}/freeze`, {
     method: "POST",
-    headers: getHeaders(),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -107,9 +55,8 @@ export async function freezeAgent(id) {
 }
 
 export async function unfreezeAgent(id) {
-  const response = await fetch(`${API_BASE_URL}/agents/${id}/unfreeze`, {
+  const response = await apiFetch(`${API_BASE_URL}/agents/${id}/unfreeze`, {
     method: "POST",
-    headers: getHeaders(),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -119,13 +66,13 @@ export async function unfreezeAgent(id) {
 }
 
 export async function updatePolicy(id, perTxLimit, dailyLimit) {
-  const response = await fetch(`${API_BASE_URL}/agents/${id}/policy`, {
+  const response = await apiFetch(`${API_BASE_URL}/agents/${id}/policy`, {
     method: "PUT",
-    headers: getHeaders({
+    headers: {
       "Content-Type": "application/json",
-    }),
+    },
     body: JSON.stringify({
-      per_transaction_limit: parseFloat(perTxLimit), // Note: updated to match backend field name
+      per_transaction_limit: parseFloat(perTxLimit),
       daily_limit: parseFloat(dailyLimit),
     }),
   });
@@ -142,13 +89,14 @@ export async function addToAllowlist(
   displayName = null,
   destinationReference = null,
 ) {
-  const response = await fetch(`${API_BASE_URL}/agents/${id}/allowlist`, {
+  const parsedId = parseInt(merchantId);
+  const response = await apiFetch(`${API_BASE_URL}/agents/${id}/allowlist`, {
     method: "POST",
-    headers: getHeaders({
+    headers: {
       "Content-Type": "application/json",
-    }),
+    },
     body: JSON.stringify({
-      merchant_id: parseInt(merchantId),
+      merchant_id: isNaN(parsedId) ? null : parsedId,
       display_name: displayName,
       destination_reference: destinationReference,
     }),
@@ -161,11 +109,10 @@ export async function addToAllowlist(
 }
 
 export async function removeFromAllowlist(id, merchantId) {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/agents/${id}/allowlist/${merchantId}`,
     {
       method: "DELETE",
-      headers: getHeaders(),
     },
   );
   if (!response.ok) {

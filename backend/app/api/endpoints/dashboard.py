@@ -9,14 +9,12 @@ Thin router: delegates everything to ``dashboard_service``.
 from fastapi import APIRouter, Depends, Query
 
 
-from app.api.auth_deps import get_current_user
 from app.api.dashboard_schemas import (
     ActivityResponse,
     AuditResponse,
     DashboardSummary,
 )
 from app.db.session import get_session
-from app.models.user import User
 from app.services import dashboard_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -42,10 +40,9 @@ Returns the high-level metrics the owner dashboard needs:
 )
 async def summary(
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> DashboardSummary:
     """Return dashboard KPIs."""
-    data = await dashboard_service.get_summary(session, user_id=user.id)
+    data = await dashboard_service.get_summary(session)
     return DashboardSummary(**data)
 
 
@@ -80,11 +77,10 @@ async def activity(
     ),
     limit: int = Query(default=50, ge=1, le=200),
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> ActivityResponse:
     """Return recent payment activity."""
     items, total = await dashboard_service.get_activity(
-        session, agent_id=agent_id, status_filter=status, limit=limit, user_id=user.id,
+        session, agent_id=agent_id, status_filter=status, limit=limit,
     )
     return ActivityResponse(total=total, items=items)
 
@@ -115,10 +111,9 @@ async def audit_log(
     ),
     limit: int = Query(default=50, ge=1, le=200),
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> AuditResponse:
     """Return recent audit log entries."""
     items, total = await dashboard_service.get_audit(
-        session, event_type=event_type, limit=limit, user_id=user.id,
+        session, event_type=event_type, limit=limit,
     )
     return AuditResponse(total=total, items=items)

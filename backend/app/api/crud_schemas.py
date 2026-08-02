@@ -261,11 +261,17 @@ class AllowlistAdd(BaseModel):
     Example:
         { "merchant_id": 1 }
     """
-    merchant_id: int = Field(
-        ...,
-        gt=0,
-        examples=[1],
+    merchant_id: int | None = Field(
+        None,
         description="ID of an existing merchant to add to this agent's allowlist.",
+    )
+    display_name: str | None = Field(
+        None,
+        description="Name of the new merchant if not already existing."
+    )
+    destination_reference: str | None = Field(
+        None,
+        description="Address of the new merchant if not already existing."
     )
 
 

@@ -14,9 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query
 
 from app.api.ai_schemas import AIExplanation, ExplainBlockedRequest, ExplainPolicyRequest
-from app.api.auth_deps import get_current_user
 from app.db.session import get_session
-from app.models.user import User
 from app.services.ai_service import (
     explain_blocked_payment,
     explain_policy,
@@ -47,7 +45,6 @@ and what the owner can do.
 async def explain_blocked(
     body: ExplainBlockedRequest,
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     """Explain a blocked payment."""
     explanation = await explain_blocked_payment(
@@ -78,7 +75,6 @@ Send the agent's policy details — only the fields you send are used.
 async def explain_policy_route(
     body: ExplainPolicyRequest,
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     """Explain a spending policy."""
     policy: dict[str, Any] = {}
@@ -121,7 +117,6 @@ async def summarize_audit_route(
     ),
     limit: int = Query(default=50, ge=1, le=200),
     session = Depends(get_session),
-    user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     """Summarise recent audit activity."""
     filters = []

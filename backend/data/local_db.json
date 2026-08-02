@@ -1,0 +1,101 @@
+{
+  "merchants": {
+    "1": {
+      "id": 1,
+      "display_name": "Compute Provider",
+      "display_name_lower": "compute provider",
+      "destination_reference": "compute_provider",
+      "description": "Primary cloud compute vendor.",
+      "active": true,
+      "created_at": "2026-08-02T12:29:58.387857+00:00"
+    },
+    "2": {
+      "id": 2,
+      "display_name": "API Provider",
+      "display_name_lower": "api provider",
+      "destination_reference": "api_provider",
+      "description": "LLM API credits provider.",
+      "active": true,
+      "created_at": "2026-08-02T12:29:58.388951+00:00"
+    },
+    "3": {
+      "id": 3,
+      "display_name": "Vendor A",
+      "display_name_lower": "vendor a",
+      "destination_reference": "vendor_a",
+      "description": "General tech supplier.",
+      "active": true,
+      "created_at": "2026-08-02T12:29:58.390145+00:00"
+    },
+    "4": {
+      "id": 4,
+      "display_name": "AWS Cloud Services",
+      "display_name_lower": "aws cloud services",
+      "destination_reference": "aws_demo",
+      "description": "AWS cloud services account.",
+      "active": true,
+      "created_at": "2026-08-02T12:29:58.391377+00:00"
+    },
+    "5": {
+      "id": 5,
+      "display_name": "Malicious Recipient",
+      "display_name_lower": "malicious recipient",
+      "destination_reference": "malicious_hacker",
+      "description": "Non-allowlisted malicious actor.",
+      "active": true,
+      "created_at": "2026-08-02T12:29:58.392952+00:00"
+    }
+  },
+  "counters": {
+    "merchants": {
+      "value": 5
+    },
+    "agents": {
+      "value": 1
+    },
+    "agent_allowlist": {
+      "value": 4
+    }
+  },
+  "agents": {
+    "1": {
+      "id": 1,
+      "name": "Agent-01",
+      "name_lower": "agent-01",
+      "description": "Default autonomous spending agent",
+      "status": "ACTIVE",
+      "balance": 10.0,
+      "per_transaction_limit": 1.0,
+      "daily_limit": 5.0,
+      "max_requests_per_minute": 10,
+      "created_at": "2026-08-02T12:29:58.394718+00:00",
+      "updated_at": "2026-08-02T12:29:58.394722+00:00"
+    }
+  },
+  "agent_allowlist": {
+    "1": {
+      "id": 1,
+      "agent_id": 1,
+      "merchant_id": 1,
+      "created_at": "2026-08-02T12:29:58.397362+00:00"
+    },
+    "2": {
+      "id": 2,
+      "agent_id": 1,
+      "merchant_id": 2,
+      "created_at": "2026-08-02T12:29:58.400147+00:00"
+    },
+    "3": {
+      "id": 3,
+      "agent_id": 1,
+      "merchant_id": 3,
+      "created_at": "2026-08-02T12:29:58.403429+00:00"
+    },
+    "4": {
+      "id": 4,
+      "agent_id": 1,
+      "merchant_id": 4,
+      "created_at": "2026-08-02T12:29:58.406148+00:00"
+    }
+  }
+}

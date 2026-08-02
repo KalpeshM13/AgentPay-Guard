@@ -27,18 +27,6 @@ from app.services.allowlist_service import (  # noqa: F401
     remove_from_allowlist,
 )
 
-# -- Authentication ------------------------------------------------------------
-from app.services.auth_service import (  # noqa: F401
-    authenticate_user,
-    create_access_token,
-    decode_access_token,
-    get_user_by_email,
-    get_user_by_id,
-    hash_password,
-    register_user,
-    verify_password,
-)
-
 # -- Dashboard (read-only queries) ---------------------------------------------
 from app.services.dashboard_service import (  # noqa: F401
     get_activity,

@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     # -- API prefix ----------------------------------------------------------
     API_V1_PREFIX: str = "/api/v1"
 
+    # -- Blockchain Configuration --------------------------------------------
+    IS_BLOCKCHAIN_ENABLED: bool = False
+    RPC_PROVIDER_URL: str = "http://127.0.0.1:8545"
+    SMART_CONTRACT_ADDRESS: str | None = None
+    AGENT_PRIVATE_KEY: str | None = None
+
     # -- AI Providers (optional — backend works without them) ----------------
     # Set to a real key to enable AI-powered explanations and summaries.
     GROQ_API_KEY: str = ""

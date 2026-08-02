@@ -21,6 +21,14 @@ class Agent(Base):
         if not hasattr(self, "balance"):
             self.balance = 0.0
         
+        from app.core.config import settings
+        if not hasattr(self, "per_transaction_limit"):
+            self.per_transaction_limit = settings.DEFAULT_PER_TRANSACTION_LIMIT
+        if not hasattr(self, "daily_limit"):
+            self.daily_limit = settings.DEFAULT_DAILY_LIMIT
+        if not hasattr(self, "max_requests_per_minute"):
+            self.max_requests_per_minute = settings.DEFAULT_MAX_REQUESTS_PER_MINUTE
+        
         # Ensure status is AgentStatus enum type
         if hasattr(self, "status") and isinstance(self.status, str):
             self.status = AgentStatus(self.status)
