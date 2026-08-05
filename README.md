@@ -24,6 +24,8 @@ Prompt-based financial boundaries are fragile. In autonomous AI agent workflows,
 
 **AgentPay Guard** resolves this risk by establishing an independent, server-side policy firewall between the AI agent and the payment settlement layer. The agent can _request_ payments, but it **never owns credentials, never touches private keys directly, and cannot bypass independent validation**.
 
+🔗 **[Live Demo](https://agentpay-guard-a30d.onrender.com)**
+
 > [!IMPORTANT] > **Core Security Philosophy**: The AI agent operates in an isolated, untrusted layer. Independent policy evaluation runs server-side before any money movement is authorized or broadcast on-chain.
 
 ---
@@ -152,10 +154,10 @@ IS_BLOCKCHAIN_ENABLED=true
 RPC_PROVIDER_URL="http://127.0.0.1:8545"
 
 # Deployed Smart Contract Address (Output from 'npx hardhat run scripts/deploy.js')
-SMART_CONTRACT_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3"
+SMART_CONTRACT_ADDRESS="[YOUR-SMART-CONTRACT-ADDRESS]"
 
 # Private key of deployer / agent operator account (Hardhat Account #0 by default)
-AGENT_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+AGENT_PRIVATE_KEY="[AGENT-PRIVATE-KEY]"
 ```
 
 > [!NOTE] > **Firebase Credentials**: Ensure `firebase-key.json` exists in `backend/` and `FIREBASE_CREDENTIALS_PATH="firebase-key.json"` is set in your `.env`. Also ensure your Firebase console has **Cloud Firestore Database** enabled.
