@@ -26,6 +26,9 @@ Prompt-based financial boundaries are fragile. In autonomous AI agent workflows,
 
 🔗 **[Live Demo](https://agentpay-guard-a30d.onrender.com)**
 
+> [!NOTE] 
+> **Live Demo Setup:** Because the demo interacts with a local blockchain for safety, you must run a local Hardhat node on your machine to use it. Run `npx hardhat node` in your terminal and ensure your MetaMask is connected to **Localhost 8545** (Chain ID: 31337).
+
 > [!IMPORTANT] > **Core Security Philosophy**: The AI agent operates in an isolated, untrusted layer. Independent policy evaluation runs server-side before any money movement is authorized or broadcast on-chain.
 
 ---
