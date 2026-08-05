@@ -21,7 +21,6 @@ async def init_db() -> None:
         logger.warning("Firebase not initialized. Seeding skipped.")
         return
 
-    # Seed default data
     await _seed_default_agent_and_merchants(session)
     logger.info("Database initialization complete.")
 
@@ -35,7 +34,6 @@ async def _seed_default_agent_and_merchants(session: FirebaseClient) -> None:
     from app.models.merchant import Merchant
     from app.core.constants import AgentStatus
 
-    # 1. Seed merchants
     merchants_to_seed = [
         (1, "Compute Provider", "compute_provider", "Primary cloud compute vendor."),
         (2, "API Provider", "api_provider", "LLM API credits provider."),
@@ -62,13 +60,11 @@ async def _seed_default_agent_and_merchants(session: FirebaseClient) -> None:
             merchant = Merchant(**merchant_data)
         seeded_merchants.append(merchant)
         
-    # Ensure counters is set to at least 5 for merchants
     counter_ref = session.db.collection("counters").document("merchants")
     snapshot = counter_ref.get()
     if not snapshot.exists or snapshot.get("value") < 5:
         counter_ref.set({"value": 5})
     
-    # 2. Seed agent
     agent_data = await session.get("agents", 1)
     
     from app.core.config import settings
@@ -90,13 +86,11 @@ async def _seed_default_agent_and_merchants(session: FirebaseClient) -> None:
     else:
         agent = Agent(**agent_data)
         
-    # Ensure counters is set to at least 1 for agents
     counter_ref_agents = session.db.collection("counters").document("agents")
     snapshot_agents = counter_ref_agents.get()
     if not snapshot_agents.exists or snapshot_agents.get("value") < 1:
         counter_ref_agents.set({"value": 1})
 
-    # 3. Associate all 4 merchants to the agent's allowlist
     for merchant in seeded_merchants:
         if merchant.id == 5:
             continue

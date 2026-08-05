@@ -1,9 +1,6 @@
 """Pydantic request/response schemas shared across API endpoints."""
 
 
-# ---------------------------------------------------------------------------
-# Re-export everything from all schema modules
-# ---------------------------------------------------------------------------
 from app.api.ai_schemas import (  # noqa: F401
     AIExplanation,
     ExplainBlockedRequest,
@@ -45,31 +42,25 @@ from app.api.payment_schemas import (  # noqa: F401
 )
 
 __all__ = [
-    # Auth
     "LoginRequest",
     "RegisterRequest",
     "TokenResponse",
     "UserResponse",
-    # Agents
     "AgentCreate",
     "AgentUpdate",
     "AgentResponse",
     "AgentListResponse",
     "PolicyUpdate",
-    # Merchants
     "MerchantCreate",
     "MerchantResponse",
     "MerchantListResponse",
-    # Allowlist
     "AllowlistAdd",
     "AllowlistEntryResponse",
     "AllowlistResponse",
-    # Payments
     "PaymentRequestSchema",
     "PaymentResponse",
     "PaymentRequestItem",
     "PaymentRequestListResponse",
-    # Dashboard
     "DashboardSummary",
     "ActivityFilter",
     "ActivityItem",
@@ -77,7 +68,6 @@ __all__ = [
     "AuditFilter",
     "AuditItem",
     "AuditResponse",
-    # AI
     "AIExplanation",
     "ExplainBlockedRequest",
     "ExplainPolicyRequest",

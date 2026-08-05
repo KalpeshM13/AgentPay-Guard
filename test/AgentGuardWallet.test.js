@@ -19,13 +19,11 @@ describe("AgentGuardWallet", function () {
     wallet = await AgentGuardWallet.deploy(agent.address, perTxLimit, periodLimit);
     await wallet.waitForDeployment();
 
-    // Fund the wallet with some ETH for executing transactions
     await owner.sendTransaction({
       to: await wallet.getAddress(),
       value: ethers.parseEther("10.0")
     });
 
-    // Allowlist the merchant address
     await wallet.connect(owner).setAllowedTarget(merchant.address, true);
   });
 
@@ -130,18 +128,14 @@ describe("AgentGuardWallet", function () {
     });
 
     it("Should fail if the payment exceeds the per-transaction limit", async function () {
-      const payAmount = ethers.parseEther("1.5"); // perTxLimit is 1.0
+      const payAmount = ethers.parseEther("1.5");
       await expect(wallet.connect(agent).execute(merchant.address, payAmount, "0x"))
         .to.be.revertedWith("PER_TX_LIMIT");
     });
 
     it("Should fail if cumulative payments exceed the period limit", async function () {
-      // First transaction: 0.9 ETH (under perTxLimit of 1.0, under periodLimit of 5.0)
       await wallet.connect(agent).execute(merchant.address, ethers.parseEther("0.9"), "0x");
       
-      // Cumulative spend now 0.9 ETH.
-      // Attempt another 4.2 ETH (period limit is 5.0, so 0.9 + 4.2 = 5.1 ETH which exceeds it)
-      // Note: we need to update perTxLimit first to allow a single 4.2 ETH transaction, or do multiple smaller ones.
       await wallet.connect(owner).setLimits(ethers.parseEther("5.0"), periodLimit);
 
       await expect(wallet.connect(agent).execute(merchant.address, ethers.parseEther("4.2"), "0x"))

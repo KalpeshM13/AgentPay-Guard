@@ -22,7 +22,6 @@ venv/
 *.db-wal
 firebase-key.json
 
-
 # Testing
 .pytest_cache/
 .coverage

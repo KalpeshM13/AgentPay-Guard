@@ -16,9 +16,6 @@ from app.models.merchant import Merchant
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Helper to load relationships
-# =============================================================================
 
 async def _load_agent_relations(session: any, agent: Agent) -> None:
     """Fetch and attach allowlist entries and merchants for an agent."""
@@ -35,9 +32,6 @@ async def _load_agent_relations(session: any, agent: Agent) -> None:
     agent.allowlist_entries = allowlist_entries
 
 
-# =============================================================================
-# Queries
-# =============================================================================
 
 async def get_agent_by_id(
     session: any, agent_id: int, *, load_allowlist: bool = True,
@@ -75,7 +69,6 @@ async def get_agent_by_identifier(
         return None
     except ValueError:
         name_str = str(identifier).strip().lower()
-        # Query normal, replace underscores/hyphens for fuzzy matches
         for n_str in [name_str, name_str.replace("_", "-"), name_str.replace("-", "_")]:
             results = await session.query("agents", [("name_lower", "==", n_str)])
             if results:
@@ -97,7 +90,6 @@ async def list_agents(
     
     filtered = []
     for data in all_matching:
-        # Status filter
         if status is not None:
             a_status = data.get("status")
             status_val = status.value if isinstance(status, AgentStatus) else status
@@ -106,7 +98,6 @@ async def list_agents(
         
         filtered.append(Agent(**data))
         
-    # Order by id
     filtered.sort(key=lambda x: x.id)
     
     total = len(filtered)
@@ -120,9 +111,6 @@ async def list_agents(
     return agents, total
 
 
-# =============================================================================
-# Mutations
-# =============================================================================
 
 async def create_agent(
     session: any,
@@ -234,7 +222,6 @@ async def delete_agent(session: any, agent: Agent) -> None:
     agent_id = agent.id
     agent_name = agent.name
     
-    # Cascade delete allowlist entries
     entries_data = await session.query("agent_allowlist", [("agent_id", "==", agent_id)])
     for ed in entries_data:
         await session.delete("agent_allowlist", ed["id"])
@@ -273,9 +260,6 @@ async def unfreeze_agent(session: any, agent: Agent) -> Agent:
     return agent
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
 
 async def _write_audit(
     session: any,

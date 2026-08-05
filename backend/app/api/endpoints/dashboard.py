@@ -20,9 +20,6 @@ from app.services import dashboard_service
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-# =============================================================================
-# GET /dashboard/summary
-# =============================================================================
 
 
 @router.get(
@@ -46,9 +43,6 @@ async def summary(
     return DashboardSummary(**data)
 
 
-# =============================================================================
-# GET /dashboard/activity
-# =============================================================================
 
 
 @router.get(
@@ -85,9 +79,6 @@ async def activity(
     return ActivityResponse(total=total, items=items)
 
 
-# =============================================================================
-# GET /dashboard/audit
-# =============================================================================
 
 
 @router.get(

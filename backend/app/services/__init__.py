@@ -1,6 +1,5 @@
 """Business logic services package."""
 
-# -- Agent CRUD ----------------------------------------------------------------
 from app.services.agent_service import (  # noqa: F401
     create_agent,
     delete_agent,
@@ -12,14 +11,12 @@ from app.services.agent_service import (  # noqa: F401
     update_agent,
 )
 
-# -- AI explainability (optional) ----------------------------------------------
 from app.services.ai_service import (  # noqa: F401
     explain_blocked_payment,
     explain_policy,
     summarize_audit,
 )
 
-# -- Allowlist management ------------------------------------------------------
 from app.services.allowlist_service import (  # noqa: F401
     add_to_allowlist,
     get_allowlist_entry,
@@ -27,14 +24,12 @@ from app.services.allowlist_service import (  # noqa: F401
     remove_from_allowlist,
 )
 
-# -- Dashboard (read-only queries) ---------------------------------------------
 from app.services.dashboard_service import (  # noqa: F401
     get_activity,
     get_audit,
     get_summary,
 )
 
-# -- Merchant CRUD -------------------------------------------------------------
 from app.services.merchant_service import (  # noqa: F401
     create_merchant,
     delete_merchant,
@@ -43,7 +38,6 @@ from app.services.merchant_service import (  # noqa: F401
     list_merchants,
 )
 
-# -- Payment Executor ----------------------------------------------------------
 from app.services.payment_executor import (  # noqa: F401
     count_recent_requests,
     execute,
@@ -51,7 +45,6 @@ from app.services.payment_executor import (  # noqa: F401
     is_duplicate_request_id,
 )
 
-# -- Policy Engine -------------------------------------------------------------
 from app.services.policy_engine import (  # noqa: F401
     PolicyContext,
     PolicyDecision,

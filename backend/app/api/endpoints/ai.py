@@ -24,9 +24,6 @@ from app.services.ai_service import (
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-# =============================================================================
-# POST /ai/explain-blocked
-# =============================================================================
 
 
 @router.post(
@@ -56,9 +53,6 @@ async def explain_blocked(
     return _response(explanation)
 
 
-# =============================================================================
-# POST /ai/explain-policy
-# =============================================================================
 
 
 @router.post(
@@ -93,9 +87,6 @@ async def explain_policy_route(
     return _response(explanation)
 
 
-# =============================================================================
-# GET /ai/summarize-audit
-# =============================================================================
 
 
 @router.get(
@@ -106,7 +97,6 @@ async def explain_policy_route(
 Returns a plain-English summary of recent audit events, using AI when
 available or a deterministic fallback otherwise.
 
-### Optional query params
 - ``agent_id`` — only include events for this agent
 - ``limit`` — max events to summarise (default 50, max 200)
 """,
@@ -123,7 +113,6 @@ async def summarize_audit_route(
     if agent_id is not None:
         filters.append(("actor", "==", f"agent:{agent_id}"))
 
-    # Fetch matching audit events, sort locally and limit
     all_audits = await session.query("audit_events", filters=filters)
     
     def get_timestamp(audit):
@@ -156,9 +145,6 @@ async def summarize_audit_route(
     return _response(explanation)
 
 
-# =============================================================================
-# Helper
-# =============================================================================
 
 
 def _response(explanation: str) -> dict[str, str]:

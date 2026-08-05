@@ -29,15 +29,12 @@ class Agent(Base):
         if not hasattr(self, "max_requests_per_minute"):
             self.max_requests_per_minute = settings.DEFAULT_MAX_REQUESTS_PER_MINUTE
         
-        # Ensure status is AgentStatus enum type
         if hasattr(self, "status") and isinstance(self.status, str):
             self.status = AgentStatus(self.status)
 
-        # Allowlist relations
         if not hasattr(self, "allowlist_entries"):
             self.allowlist_entries = []
 
-        # Convert timestamps from Firestore Timestamp objects
         for attr in ["created_at", "updated_at"]:
             if hasattr(self, attr):
                 v = getattr(self, attr)
@@ -53,7 +50,6 @@ class Agent(Base):
         data = super().to_dict()
         if "status" in data and isinstance(data["status"], AgentStatus):
             data["status"] = data["status"].value
-        # Exclude temporary relationship attributes from direct serialization
         data.pop("allowlist_entries", None)
         return data
 

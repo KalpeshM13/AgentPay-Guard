@@ -14,16 +14,12 @@ from app.api.endpoints.payments import router as payments_router
 
 api_router = APIRouter()
 
-# ---------------------------------------------------------------------------
-# Sub-routers
-# ---------------------------------------------------------------------------
 api_router.include_router(ai_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(payments_router)
 api_router.include_router(agents_router)
 api_router.include_router(merchants_router)
 
-# Allowlist is a sub-resource of agents — prefix is "{agent_id}"
 api_router.include_router(
     allowlist_router,
     prefix="/agents/{agent_id}/allowlist",

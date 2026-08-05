@@ -19,9 +19,6 @@ from app.services.ai.groq_service import GroqProvider
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# No-op provider for when no API keys are configured
-# =============================================================================
 
 
 class _NoOpProvider:
@@ -46,9 +43,6 @@ class _NoOpProvider:
         return _fallback_summarize_audit(events)
 
 
-# =============================================================================
-# Lazy provider cache — initialised on first call
-# =============================================================================
 
 _provider: AIProvider | _NoOpProvider | None = None
 
@@ -60,29 +54,23 @@ def _get_provider() -> AIProvider | _NoOpProvider:
     if _provider is not None:
         return _provider
 
-    # Try Groq first (fast, free tier)
     groq = GroqProvider()
     if groq.is_available:
         logger.info("AI: using Groq provider (model=%s)", groq._model)
         _provider = groq
         return _provider
 
-    # Then Gemini
     gemini = GeminiProvider()
     if gemini.is_available:
         logger.info("AI: using Gemini provider (model=%s)", gemini._model)
         _provider = gemini
         return _provider
 
-    # No provider available — use pure fallback
     logger.info("AI: no provider configured — using deterministic fallbacks")
     _provider = _NoOpProvider()
     return _provider
 
 
-# =============================================================================
-# Public API
-# =============================================================================
 
 
 async def explain_blocked_payment(

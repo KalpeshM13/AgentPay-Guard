@@ -14,7 +14,6 @@ class PaymentRequest(Base):
         if not hasattr(self, "created_at"):
             self.created_at = datetime.now()
 
-        # Convert timestamps from Firestore Timestamp objects
         for attr in ["created_at"]:
             if hasattr(self, attr):
                 v = getattr(self, attr)

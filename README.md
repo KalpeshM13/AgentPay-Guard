@@ -200,13 +200,7 @@ AGENT_PRIVATE_KEY="[AGENT-PRIVATE-KEY]"
    pip install -r requirements.txt
    ```
 
-4. Setup environment variables:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-5. Start the FastAPI backend:
+4. Start the FastAPI backend:
 
    ```bash
    uvicorn app.main:app --reload

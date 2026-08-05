@@ -10,7 +10,6 @@ async function main() {
   console.log("Contract Owner (admin):", owner.address);
   console.log("Authorized Agent:", agentAddress);
 
-  // Set initial spend limits (0.01 ETH per tx, 0.05 ETH per period for testnets)
   const isLocal = network.name === "hardhat" || network.name === "localhost";
   const perTxLimit = isLocal
     ? ethers.parseEther("1.0")
@@ -34,12 +33,11 @@ async function main() {
   console.log(contractAddress);
   console.log("----------------------------------------------------");
 
-  // Allowlist mock target addresses
   const mockMerchantAddresses = [
-    "0x1111111111111111111111111111111111111111", // Compute Provider
-    "0x2222222222222222222222222222222222222222", // API Provider
-    "0x3333333333333333333333333333333333333333", // Vendor A
-    "0x4444444444444444444444444444444444444444", // AWS Cloud Services
+    "0x1111111111111111111111111111111111111111",
+    "0x2222222222222222222222222222222222222222",
+    "0x3333333333333333333333333333333333333333",
+    "0x4444444444444444444444444444444444444444",
   ];
 
   for (const addr of mockMerchantAddresses) {
@@ -52,7 +50,6 @@ async function main() {
     }
   }
 
-  // Fund contract wallet if on local network
   if (isLocal) {
     const fundingTx = await owner.sendTransaction({
       to: contractAddress,

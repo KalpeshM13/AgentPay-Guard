@@ -24,16 +24,12 @@ async def _get_admin_user_id(session: any) -> int:
     return admin_user.id if admin_user is not None else 1
 
 
-# =============================================================================
-# GET /dashboard/summary
-# =============================================================================
 
 async def get_summary(session: any, user_id: int | None = None) -> dict:
     """Return the KPIs the owner dashboard needs."""
     today = _today_start()
     admin_user_id = await _get_admin_user_id(session) if user_id is not None else 1
 
-    # -- Agent counts & balance ----------------------------------------------
     agents = await session.query("agents")
     filtered_agents = []
     for a in agents:
@@ -48,16 +44,13 @@ async def get_summary(session: any, user_id: int | None = None) -> dict:
     active_agents = total_agents - frozen_agents
     total_balance = sum(float(a.get("balance", 0.0)) for a in filtered_agents)
 
-    # -- Today's spending (only settled transactions) ------------------------
     transactions = await session.query("transactions")
     today_spending = 0.0
     for tx in transactions:
-        # filter user_id
         tx_uid = tx.get("user_id")
         if user_id is not None:
             if tx_uid != user_id and not (user_id == admin_user_id and tx_uid is None):
                 continue
-        # check settled_at >= today
         settled_at = tx.get("settled_at")
         if settled_at:
             if hasattr(settled_at, "to_datetime"):
@@ -70,17 +63,14 @@ async def get_summary(session: any, user_id: int | None = None) -> dict:
             if settled_at_dt >= today:
                 today_spending += float(tx.get("amount", 0.0))
 
-    # -- Today's request counts ----------------------------------------------
     requests_today = await session.query("payment_requests")
     today_settled = 0
     today_blocked = 0
     for pr in requests_today:
-        # filter user_id
         pr_uid = pr.get("user_id")
         if user_id is not None:
             if pr_uid != user_id and not (user_id == admin_user_id and pr_uid is None):
                 continue
-        # check today
         created_at = pr.get("created_at")
         if created_at:
             if hasattr(created_at, "to_datetime"):
@@ -107,9 +97,6 @@ async def get_summary(session: any, user_id: int | None = None) -> dict:
     }
 
 
-# =============================================================================
-# GET /dashboard/activity
-# =============================================================================
 
 async def get_activity(
     session: any,
@@ -125,20 +112,16 @@ async def get_activity(
     
     filtered_reqs = []
     for r in all_reqs:
-        # Filter user_id
         r_uid = r.get("user_id")
         if user_id is not None:
             if r_uid != user_id and not (user_id == admin_user_id and r_uid is None):
                 continue
-        # Filter agent_id
         if agent_id is not None and r.get("agent_id") != agent_id:
             continue
-        # Filter status
         if status_filter is not None and r.get("status") != status_filter:
             continue
         filtered_reqs.append(r)
 
-    # Sort locally by created_at desc
     def get_created_at(pr):
         ca = pr.get("created_at")
         if ca is None:
@@ -157,7 +140,6 @@ async def get_activity(
     total = len(filtered_reqs)
     rows = filtered_reqs[:limit]
 
-    # Resolve agent names in batch
     agent_ids = {r.get("agent_id") for r in rows if r.get("agent_id") is not None}
     agent_names: dict[int, str] = {}
     for a_id in agent_ids:
@@ -183,9 +165,6 @@ async def get_activity(
     return items, total
 
 
-# =============================================================================
-# GET /dashboard/audit
-# =============================================================================
 
 async def get_audit(
     session: any,
@@ -200,12 +179,10 @@ async def get_audit(
     
     filtered_audits = []
     for r in all_audits:
-        # Filter user_id
         r_uid = r.get("user_id")
         if user_id is not None:
             if r_uid != user_id and not (user_id == admin_user_id and r_uid is None):
                 continue
-        # Filter event_type
         if event_type is not None and r.get("event_type") != event_type:
             continue
         filtered_audits.append(r)
@@ -243,9 +220,6 @@ async def get_audit(
     return items, total
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
 
 def _today_start() -> datetime:
     """Return the start of the current UTC day."""

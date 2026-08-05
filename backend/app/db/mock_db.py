@@ -43,7 +43,6 @@ class LocalDBClient:
         if collection not in self.data:
             self.data[collection] = {}
         
-        # Serialize datetime objects if present
         safe_data = {}
         for k, v in data.items():
             if hasattr(v, "isoformat"):

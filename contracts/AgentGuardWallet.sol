@@ -45,7 +45,6 @@ contract AgentGuardWallet {
         periodLimit = _periodLimit;
     }
 
-    // Fallback function to accept funds
     receive() external payable {}
 
     function execute(
@@ -98,12 +97,10 @@ contract AgentGuardWallet {
         emit LimitsUpdated(perTx, period);
     }
 
-    // Reset period spending - for simplicity in hackathon demo
     function resetPeriodSpent() external onlyOwner {
         spentThisPeriod = 0;
     }
 
-    // Withdraw funds - owner can recover funds
     function withdraw(uint256 amount) external onlyOwner {
         require(amount <= address(this).balance, "INSUFFICIENT_BALANCE");
         (bool ok, ) = owner.call{value: amount}("");

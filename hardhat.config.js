@@ -11,7 +11,6 @@ function loadEnv() {
       if (match) {
         const key = match[1];
         const value = match[2];
-        // Allow later entries to overwrite earlier entries in .env
         process.env[key] = value;
       }
     });
@@ -24,7 +23,6 @@ if (privateKey && !privateKey.startsWith("0x")) {
   privateKey = "0x" + privateKey;
 }
 
-/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.20",
   networks: {

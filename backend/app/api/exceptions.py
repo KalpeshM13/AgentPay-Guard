@@ -28,7 +28,6 @@ async def generic_exception_handler(
 ) -> JSONResponse:
     """Catch-all handler for unhandled exceptions."""
     if settings.DEBUG:
-        # In debug mode, return the actual error message for convenience
         detail = str(exc)
     else:
         detail = "Internal server error"

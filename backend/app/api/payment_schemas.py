@@ -8,9 +8,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-# =============================================================================
-# POST /payments — request
-# =============================================================================
 
 class PaymentRequestSchema(BaseModel):
     """Body for ``POST /payments`` — what the agent sends.
@@ -50,9 +47,6 @@ class PaymentRequestSchema(BaseModel):
     )
 
 
-# =============================================================================
-# POST /payments — response
-# =============================================================================
 
 class PaymentResponse(BaseModel):
     """Returned after the full policy + executor pipeline.
@@ -93,9 +87,6 @@ class PaymentResponse(BaseModel):
     )
 
 
-# =============================================================================
-# Payment request list item (for transaction log)
-# =============================================================================
 
 class PaymentRequestItem(BaseModel):
     """Single item in the transaction / audit log feed."""

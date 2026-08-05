@@ -15,7 +15,6 @@ class AuditLog(Base):
         if not hasattr(self, "timestamp"):
             self.timestamp = datetime.now()
 
-        # Convert timestamps from Firestore Timestamp objects
         for attr in ["timestamp"]:
             if hasattr(self, attr):
                 v = getattr(self, attr)

@@ -13,9 +13,6 @@ from app.models.merchant import Merchant
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Queries
-# =============================================================================
 
 async def list_allowlist(
     session: any, agent: Agent,
@@ -26,7 +23,6 @@ async def list_allowlist(
     allowlist_entries = []
     for data in results:
         entry = AgentMerchant(**data)
-        # Load merchant
         m_data = await session.get("merchants", entry.merchant_id)
         if m_data:
             entry.merchant = Merchant(**m_data)
@@ -50,9 +46,6 @@ async def get_allowlist_entry(
     return None
 
 
-# =============================================================================
-# Mutations
-# =============================================================================
 
 async def add_to_allowlist(
     session: any, agent: Agent, merchant: Merchant,
@@ -74,7 +67,6 @@ async def add_to_allowlist(
     )
     await session.insert("agent_allowlist", next_id, entry.to_dict())
     
-    # Attach loaded relationships for the returned object
     entry.merchant = merchant
     entry.agent = agent
     

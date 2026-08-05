@@ -9,9 +9,6 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# ---------------------------------------------------------------------------
-# Project root – resolves relative paths like ./data/agentpay.db
-# ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -28,7 +25,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # -- Application ---------------------------------------------------------
     APP_NAME: str = "AgentPay Guard"
     APP_VERSION: str = "0.1.0"
     APP_DESCRIPTION: str = (
@@ -36,72 +32,52 @@ class Settings(BaseSettings):
     )
     DEBUG: bool = False
 
-    # -- Server --------------------------------------------------------------
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     CORS_ORIGINS: list[str] = ["*"]
 
-    # -- Database ------------------------------------------------------------
-    # SQLite is the default for the hackathon MVP; use aiosqlite for async.
     DATABASE_URL: str = (
         f"sqlite+aiosqlite:///{PROJECT_ROOT / 'data' / 'agentpay.db'}"
     )
     DB_ECHO: bool = False  # set True during development to see SQL queries
 
-    # -- Firebase ------------------------------------------------------------
     FIREBASE_CREDENTIALS: str | None = None
     FIREBASE_CREDENTIALS_PATH: str | None = None
 
-    # -- Logging -------------------------------------------------------------
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     LOG_FORMAT: Literal["text", "json"] = "text"
 
-    # -- Security ------------------------------------------------------------
     SECRET_KEY: str = "change-me-in-production"
 
-    # -- JWT Authentication --------------------------------------------------
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # -- Default owner (created on first startup) ----------------------------
     DEFAULT_OWNER_EMAIL: str = "admin@agentpay.dev"
     DEFAULT_OWNER_PASSWORD: str = "admin123"
 
-    # -- Policy defaults (used when creating new agents) ---------------------
     DEFAULT_PER_TRANSACTION_LIMIT: float = 1_000.0
     DEFAULT_DAILY_LIMIT: float = 5_000.0
     DEFAULT_MAX_REQUESTS_PER_MINUTE: int = 10
 
-    # -- Pending payment window (seconds) ------------------------------------
     PENDING_DELAY_SECONDS: float = 5.0
 
-    # -- API prefix ----------------------------------------------------------
     API_V1_PREFIX: str = "/api/v1"
 
-    # -- Blockchain Configuration --------------------------------------------
     IS_BLOCKCHAIN_ENABLED: bool = False
     RPC_PROVIDER_URL: str = "http://127.0.0.1:8545"
     SMART_CONTRACT_ADDRESS: str | None = None
     AGENT_PRIVATE_KEY: str | None = None
 
-    # -- AI Providers (optional — backend works without them) ----------------
-    # Set to a real key to enable AI-powered explanations and summaries.
     GROQ_API_KEY: str = ""
     GROQ_DEFAULT_MODEL: str = "llama-3.1-8b-instant"
     GEMINI_API_KEY: str = ""
     GEMINI_DEFAULT_MODEL: str = "gemini-2.5-flash"
 
 
-# ---------------------------------------------------------------------------
-# Singleton — import this everywhere
-# ---------------------------------------------------------------------------
 settings = Settings()
 
 
-# =============================================================================
-# Production guard — warn if SECRET_KEY is still the default at startup
-# =============================================================================
 
 
 def validate_production_settings() -> None:

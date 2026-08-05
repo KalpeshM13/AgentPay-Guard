@@ -14,9 +14,6 @@ from pydantic import BaseModel, EmailStr, Field
 from app.core.constants import UserRole
 
 
-# ---------------------------------------------------------------------------
-# Request schemas
-# ---------------------------------------------------------------------------
 
 class RegisterRequest(BaseModel):
     """Body for ``POST /auth/register``.
@@ -69,9 +66,6 @@ class LoginRequest(BaseModel):
     )
 
 
-# ---------------------------------------------------------------------------
-# Response schemas
-# ---------------------------------------------------------------------------
 
 class TokenResponse(BaseModel):
     """Returned after a successful login.

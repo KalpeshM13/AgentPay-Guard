@@ -19,7 +19,6 @@ class AgentMerchant(Base):
         if not hasattr(self, "merchant"):
             self.merchant = None
 
-        # Convert timestamps from Firestore Timestamp objects
         for attr in ["created_at"]:
             if hasattr(self, attr):
                 v = getattr(self, attr)

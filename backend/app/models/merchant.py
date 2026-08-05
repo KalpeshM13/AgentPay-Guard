@@ -19,7 +19,6 @@ class Merchant(Base):
         if not hasattr(self, "allowlist_entries"):
             self.allowlist_entries = []
 
-        # Convert timestamps from Firestore Timestamp objects
         for attr in ["created_at", "updated_at"]:
             if hasattr(self, attr):
                 v = getattr(self, attr)

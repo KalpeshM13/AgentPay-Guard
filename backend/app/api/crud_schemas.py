@@ -10,9 +10,6 @@ from pydantic import BaseModel, Field
 from app.core.constants import AgentStatus
 
 
-# =============================================================================
-# Agent schemas
-# =============================================================================
 
 class AgentCreate(BaseModel):
     """Body for ``POST /agents`` — create a new autonomous agent.
@@ -150,9 +147,6 @@ class AgentListResponse(BaseModel):
     agents: list[AgentResponse]
 
 
-# =============================================================================
-# Policy update schema (dedicated route for clarity)
-# =============================================================================
 
 class PolicyUpdate(BaseModel):
     """Body for ``PUT /agents/{id}/policy`` — update spending rules.
@@ -187,9 +181,6 @@ class PolicyUpdate(BaseModel):
     )
 
 
-# =============================================================================
-# Merchant schemas
-# =============================================================================
 
 class MerchantCreate(BaseModel):
     """Body for ``POST /merchants``.
@@ -251,9 +242,6 @@ class MerchantListResponse(BaseModel):
     merchants: list[MerchantResponse]
 
 
-# =============================================================================
-# Allowlist schemas
-# =============================================================================
 
 class AllowlistAdd(BaseModel):
     """Body for ``POST /agents/{id}/allowlist``.
@@ -303,5 +291,4 @@ class AllowlistResponse(BaseModel):
     allowlist: list[AllowlistEntryResponse]
 
 
-# Rebuild model to resolve forward references
 AgentResponse.model_rebuild()

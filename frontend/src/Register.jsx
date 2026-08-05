@@ -36,7 +36,6 @@ export default function Register() {
     setProgress(12);
     setLoadingStep(1);
 
-    // Simulate progress updates for a smoother visual feel
     let currentProgress = 12;
     const interval = setInterval(() => {
       currentProgress += Math.floor(Math.random() * 8) + 2;
@@ -46,7 +45,6 @@ export default function Register() {
       }
       setProgress(currentProgress);
 
-      // Sync progress numbers with visual steps
       if (currentProgress > 72) {
         setLoadingStep(4);
       } else if (currentProgress > 45) {
@@ -57,21 +55,16 @@ export default function Register() {
     }, 200);
 
     try {
-      // 1. Register the user
       await api.register(email, password, displayName);
 
-      // Step 2 & 3 are executed automatically in FastAPI auth_service signup logic,
-      // so we fast-track progress indicator to step 4 "Authenticating Session"
       setProgress(85);
       setLoadingStep(4);
 
-      // 2. Perform automatic login to get access token
       const loginData = await api.login(email, password);
 
       setProgress(100);
       clearInterval(interval);
 
-      // Brief delay to let the user see 100% success state
       setTimeout(() => {
         localStorage.setItem("token", loginData.access_token);
         navigate("/dashboard");

@@ -21,29 +21,21 @@ from app.core.config import settings, validate_production_settings
 from app.db.init_db import init_db
 
 
-# ---------------------------------------------------------------------------
-# Lifespan — startup / shutdown logic
-# ---------------------------------------------------------------------------
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan."""
 
-    # -- 1. Configure logging ------------------------------------------------
     from app.core.logging import setup_logging
     setup_logging()
 
-    # -- 2. Production guard warnings ----------------------------------------
     validate_production_settings()
 
-    # -- 3. Create tables and seed default owner (idempotent) ----------------
     await init_db()
 
     yield
 
 
-# ---------------------------------------------------------------------------
-# FastAPI application instance
-# ---------------------------------------------------------------------------
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -54,7 +46,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# -- CORS — allow frontend / dashboard to call the API ------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -63,11 +54,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -- Exception handlers — structured JSON error responses --------------------
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# -- API Router — prefix all endpoints with /api/v1 --------------------------
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 app.include_router(api_router)  # root level registration for simple clients / test suite compatibility
 
@@ -75,7 +64,6 @@ app.include_router(api_router)  # root level registration for simple clients / t
 def root():
     return {"message": "API is running!"}
 
-# -- Health-check endpoint (outside the versioned API) -----------------------
 @app.get("/health", tags=["health"])
 async def health_check():
     """Liveness probe — returns 200 when the server is running."""

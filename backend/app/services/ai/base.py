@@ -19,16 +19,12 @@ logger = logging.getLogger(__name__)
 class AIProvider(ABC):
     """Abstract base for LLM service integrations."""
 
-    # -- Subclasses MUST override these ---------------------------------------
     provider_name: str = "base"
 
     def __init__(self, api_key: str | None = None) -> None:
         self._api_key = (api_key or "").strip()
         self._available = bool(self._api_key)
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     @property
     def is_available(self) -> bool:
@@ -87,7 +83,6 @@ class AIProvider(ABC):
         if not self.is_available:
             return _fallback_summarize_audit(events)
 
-        # Trim to 20 most recent events so we don't blow the context window
         recent = events[:20]
         lines = []
         for e in recent:
@@ -107,9 +102,6 @@ class AIProvider(ABC):
 
         return await self._safe_call(prompt, max_tokens=250)
 
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
 
     async def _safe_call(self, prompt: str, *, max_tokens: int) -> str:
         """Call the provider with a 6s timeout + 1 retry on transient errors.
@@ -141,9 +133,6 @@ class AIProvider(ABC):
         ...
 
 
-# =============================================================================
-# Fallback explanations (used when no AI provider is configured)
-# =============================================================================
 
 
 def _fallback_explain_blocked(
@@ -237,9 +226,6 @@ def _fallback_summarize_audit(events: list[dict]) -> str:
     return " ".join(parts)
 
 
-# =============================================================================
-# Utility
-# =============================================================================
 
 
 def _dict_to_bullets(d: dict) -> str:

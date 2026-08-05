@@ -41,7 +41,6 @@ export default function LandingPage() {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
-  // Scroll-reveal with IntersectionObserver
   const revealRefs = useRef([]);
   useEffect(() => {
     const observer = new IntersectionObserver(

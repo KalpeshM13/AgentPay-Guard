@@ -118,7 +118,6 @@ export default function App() {
       throw new Error("No valid smart contract address is configured.");
     }
 
-    // Verify if bytecode exists at address on the current network
     const code = await provider.getCode(addressToUse);
     if (!code || code === "0x" || code === "0x0") {
       throw new Error(`No smart contract bytecode deployed at ${addressToUse.substring(0, 8)}... on this network.`);
@@ -127,11 +126,9 @@ export default function App() {
     return new ethers.Contract(addressToUse, WALLET_ABI, signer);
   };
 
-  // Metamask transaction signature simulation state
   const [signingTx, setSigningTx] = useState(null);
   const [signingProgress, setSigningProgress] = useState("prompt"); // 'prompt' | 'broadcasting' | 'success'
 
-  // Console simulator logs
   const [logs, setLogs] = useState([
     { type: "info", text: "SYSTEM: AgentPay Guard Security Shield Active." },
     {
@@ -140,16 +137,13 @@ export default function App() {
     },
   ]);
 
-  // Custom transaction simulator input
   const [simMerchantId, setSimMerchantId] = useState("1");
   const [simAmount, setSimAmount] = useState("0.005");
 
-  // Modals / forms state
   const [showLimitsModal, setShowLimitsModal] = useState(false);
   const [limitPerTx, setLimitPerTx] = useState("");
   const [limitDaily, setLimitDaily] = useState("");
 
-  // Add Merchant Form state (Screen 2)
   const [newMerchantId, setNewMerchantId] = useState("");
   const [newMerchantName, setNewMerchantName] = useState("");
   const [newMerchantAddress, setNewMerchantAddress] = useState("");
@@ -161,7 +155,6 @@ export default function App() {
   const [userAgents, setUserAgents] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Load user profile and their agents list on mount
   const loadUserProfileAndAgents = async () => {
     try {
       const agentsList = await api.getAgents();
@@ -179,7 +172,6 @@ export default function App() {
       setSelectedAgentId("1");
     }
 
-    // Prompt MetaMask connection if not already connected (and was previously connected)
     if (window.ethereum && localStorage.getItem("walletAddress")) {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
@@ -203,7 +195,6 @@ export default function App() {
     addLog("info", "METAMASK: Disconnected wallet");
   };
 
-  // Load agent data and transaction history
   const fetchData = async () => {
     if (!selectedAgentId) return;
     try {
@@ -217,7 +208,6 @@ export default function App() {
       setCurrentUser({ display_name: "Admin Owner", role: "OWNER" });
       setError(null);
 
-      // Auto update MetaMask balance on every fetch poll
       if (window.ethereum && walletAddress) {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const balance = await provider.getBalance(walletAddress);
@@ -242,7 +232,6 @@ export default function App() {
     } catch (err) {
       console.error("Refresh error:", err);
     } finally {
-      // Ensure the spin animation plays for at least 1000ms for visual feedback
       const elapsedTime = Date.now() - startTime;
       const minDuration = 1000;
       if (elapsedTime < minDuration) {
@@ -258,7 +247,6 @@ export default function App() {
     loadUserProfileAndAgents();
     checkConnection();
 
-    // Listen to account changes dynamically
     if (window.ethereum) {
       const handleAccounts = async (accounts) => {
         if (accounts.length > 0 && localStorage.getItem("walletAddress")) {
@@ -298,7 +286,6 @@ export default function App() {
     }
   }, [selectedAgentId, walletAddress]);
 
-  // Scroll to bottom of console simulator
   useEffect(() => {
     if (consoleEndRef.current) {
       consoleEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -312,7 +299,6 @@ export default function App() {
     ]);
   };
 
-  // Metamask Simulation triggers
   const triggerOnChainTx = async (
     actionType,
     title,
@@ -341,7 +327,6 @@ export default function App() {
     }
   };
 
-  // API Action handlers wrapped in signature simulator
   const handleToggleFreeze = () => {
     if (!agent) return;
     const isFreezing = agent.status === "ACTIVE";
@@ -556,7 +541,6 @@ export default function App() {
     );
   };
 
-  // Simulator Payment Trigger
   const triggerSimulation = async (merchantId, amount) => {
     const randomId = `req_${Math.floor(100000 + Math.random() * 900000)}`;
     addLog(
@@ -761,7 +745,6 @@ export default function App() {
     );
   }
 
-  // Helper to format mock addresses for display
   const formatAddress = (addr) => {
     if (!addr) return "0x0000...0000";
     if (addr.length <= 12) return addr;

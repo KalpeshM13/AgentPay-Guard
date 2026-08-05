@@ -41,7 +41,6 @@ def setup_logging() -> None:
     root = logging.getLogger()
     root.setLevel(settings.LOG_LEVEL)
 
-    # Clear any handlers attached by uvicorn or third-party libraries
     for handler in root.handlers[:]:
         root.removeHandler(handler)
 
@@ -66,7 +65,6 @@ def setup_logging() -> None:
 
     root.addHandler(handler)
 
-    # Quiet noisy third-party loggers
     logging.getLogger("aiosqlite").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(
         logging.INFO if settings.DB_ECHO else logging.WARNING

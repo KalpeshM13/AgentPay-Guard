@@ -48,9 +48,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# Public types
-# =============================================================================
 
 
 @dataclass
@@ -74,9 +71,6 @@ class PolicyDecision:
     reason: str | None = None
     details: dict = field(default_factory=dict)
 
-    # ------------------------------------------------------------------
-    # Convenience constructors
-    # ------------------------------------------------------------------
     @classmethod
     def approve(cls, **details) -> PolicyDecision:
         """Return an approved decision with extra context."""
@@ -94,9 +88,6 @@ class PolicyDecision:
         return f"<PolicyDecision {status} request={rid}>"
 
 
-# =============================================================================
-# Policy input — the data the engine needs to make a decision
-# =============================================================================
 
 
 @dataclass
@@ -142,15 +133,11 @@ class PolicyContext:
     is_merchant_allowlisted: bool
     amount: float
 
-    # Injected async callbacks — these decouple the engine from the database
     get_daily_spend: Callable[[int], Awaitable[float]]
     count_recent_requests: Callable[[int, datetime], Awaitable[int]]
     is_duplicate_request_id: Callable[[str], Awaitable[bool]]
 
 
-# =============================================================================
-# The engine
-# =============================================================================
 
 
 async def evaluate(ctx: PolicyContext) -> PolicyDecision:
@@ -176,7 +163,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
         "amount": ctx.amount,
     }
 
-    # ── Check 1: Agent exists ──────────────────────────────────────────
     if ctx.agent is None:
         logger.info("Policy check 1 failed: AGENT_NOT_FOUND")
         return PolicyDecision.block(
@@ -187,7 +173,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
 
     agent: Agent = ctx.agent  # narrow type for the rest of the function
 
-    # ── Check 2: Agent ACTIVE ──────────────────────────────────────────
     if agent.status != AgentStatus.ACTIVE:
         logger.info(
             "Policy check 2 failed: AGENT_FROZEN agent_id=%d status=%s",
@@ -200,7 +185,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 3: Merchant exists ───────────────────────────────────────
     if ctx.merchant is None:
         logger.info("Policy check 3 failed: MERCHANT_NOT_FOUND")
         return PolicyDecision.block(
@@ -211,7 +195,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
 
     merchant: Merchant = ctx.merchant  # narrow type
 
-    # ── Check 4: Merchant ACTIVE ───────────────────────────────────────
     if not merchant.active:
         logger.info(
             "Policy check 4 failed: MERCHANT_NOT_ACTIVE merchant_id=%d",
@@ -223,7 +206,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 5: Merchant allowlisted ──────────────────────────────────
     if not ctx.is_merchant_allowlisted:
         logger.info(
             "Policy check 5 failed: MERCHANT_NOT_ALLOWED "
@@ -236,7 +218,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 6: Per-transaction limit ─────────────────────────────────
     if ctx.amount > agent.per_transaction_limit:
         logger.info(
             "Policy check 6 failed: PER_TX_LIMIT_EXCEEDED "
@@ -250,7 +231,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 7: Daily spend limit ─────────────────────────────────────
     spent_today: float = await ctx.get_daily_spend(agent.id)
     projected = spent_today + ctx.amount
     if projected > agent.daily_limit:
@@ -267,7 +247,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 8: Rate limit (requests / minute) ────────────────────────
     rate = await ctx.count_recent_requests(agent.id, ctx.request_timestamp)
     if rate >= agent.max_requests_per_minute:
         logger.info(
@@ -283,7 +262,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 9: Duplicate request_id ──────────────────────────────────
     if await ctx.is_duplicate_request_id(ctx.request_id):
         logger.info(
             "Policy check 9 failed: DUPLICATE_REQUEST request_id=%s",
@@ -295,7 +273,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── Check 10: Sufficient balance ───────────────────────────────────
     if ctx.amount > agent.balance:
         logger.info(
             "Policy check 10 failed: INSUFFICIENT_BALANCE "
@@ -309,7 +286,6 @@ async def evaluate(ctx: PolicyContext) -> PolicyDecision:
             **base,
         )
 
-    # ── All checks passed ──────────────────────────────────────────────
     logger.info(
         "Policy APPROVED: agent_id=%d merchant_id=%d amount=%.2f request=%s",
         agent.id, merchant.id, ctx.amount, ctx.request_id,

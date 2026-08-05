@@ -23,14 +23,9 @@ from app.services import agent_service, allowlist_service, merchant_service
 
 logger = logging.getLogger(__name__)
 
-# NOTE: the parent router registers this with prefix="/agents/{agent_id}/allowlist"
-# so all routes here are relative to that prefix.
 router = APIRouter(tags=["allowlist"])
 
 
-# =============================================================================
-# GET /agents/{agent_id}/allowlist
-# =============================================================================
 
 @router.get(
     "",
@@ -65,9 +60,6 @@ async def list_entries(
     )
 
 
-# =============================================================================
-# POST /agents/{agent_id}/allowlist
-# =============================================================================
 
 @router.post(
     "",
@@ -87,12 +79,10 @@ async def add_entry(
     session = Depends(get_session),
 ) -> AllowlistEntryResponse:
     """Add a merchant to an agent's allowlist."""
-    # Validate agent exists
     agent = await agent_service.get_agent_by_identifier(session, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
-    # Validate merchant exists or create dynamically
     merchant = None
     if body.merchant_id is not None:
         merchant = await merchant_service.get_merchant_by_id(session, body.merchant_id)
@@ -104,7 +94,6 @@ async def add_entry(
                 detail="Merchant not found, and display_name or destination_reference was not provided."
             )
         
-        # Check if a merchant with the same destination address already exists to avoid duplicates
         all_merchants, _ = await merchant_service.list_merchants(session, limit=1000)
         target_addr = body.destination_reference.strip().lower()
         for m in all_merchants:
@@ -119,7 +108,6 @@ async def add_entry(
                 destination_reference=body.destination_reference
             )
 
-    # Check it's not already on the list
     existing = await allowlist_service.get_allowlist_entry(
         session, agent.id, merchant.id,
     )
@@ -140,9 +128,6 @@ async def add_entry(
     )
 
 
-# =============================================================================
-# DELETE /agents/{agent_id}/allowlist/{merchant_id}
-# =============================================================================
 
 @router.delete(
     "/{merchant_id}",

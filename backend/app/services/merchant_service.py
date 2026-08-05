@@ -11,9 +11,6 @@ from app.models.merchant import Merchant
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Queries
-# =============================================================================
 
 async def get_merchant_by_id(
     session: any, merchant_id: int,
@@ -54,9 +51,6 @@ async def list_merchants(
     return merchants, total
 
 
-# =============================================================================
-# Mutations
-# =============================================================================
 
 async def create_merchant(
     session: any,
@@ -90,7 +84,6 @@ async def delete_merchant(session: any, merchant: Merchant) -> None:
     mid = merchant.id
     mname = merchant.display_name
     
-    # Cascade delete allowlist entries
     entries_data = await session.query("agent_allowlist", [("merchant_id", "==", mid)])
     for ed in entries_data:
         await session.delete("agent_allowlist", ed["id"])

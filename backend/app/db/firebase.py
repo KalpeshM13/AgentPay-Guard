@@ -21,7 +21,6 @@ def init_firebase():
             pass
         return
 
-    # Initialize SDK
     if settings.FIREBASE_CREDENTIALS:
         try:
             creds_dict = json.loads(settings.FIREBASE_CREDENTIALS)
@@ -40,7 +39,6 @@ def init_firebase():
             logger.error(f"Failed to load Firebase credentials from file: {e}")
             raise e
     else:
-        # Fallback to default application credentials
         try:
             firebase_admin.initialize_app()
             logger.info("Firebase initialized using application default credentials.")
@@ -118,17 +116,14 @@ class FirebaseClient:
             return []
         ref = self.db.collection(collection)
         
-        # Apply filters
         if filters:
             for field, op, val in filters:
                 ref = ref.where(filter=FieldFilter(field, op, val))
                 
-        # Apply ordering
         if order_by:
             direction = firestore.Query.DESCENDING if order_desc else firestore.Query.ASCENDING
             ref = ref.order_by(order_by, direction=direction)
             
-        # Apply offset and limit
         if offset is not None:
             ref = ref.offset(offset)
         if limit is not None:

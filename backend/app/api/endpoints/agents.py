@@ -45,7 +45,6 @@ async def populate_agent_limits(session, agent) -> None:
                 agent.daily_limit = status_info.get("period_limit_eth", agent.daily_limit)
                 agent.remaining_daily_limit = max(0.0, agent.daily_limit - spent_today)
                 
-                # Align status with on-chain freeze state
                 if status_info.get("frozen", False):
                     agent.status = AgentStatus.FROZEN
                 else:
@@ -54,9 +53,6 @@ async def populate_agent_limits(session, agent) -> None:
             logger.error(f"Failed to synchronize agent {agent.id} with blockchain state: {e}")
 
 
-# =============================================================================
-# POST /agents
-# =============================================================================
 
 @router.post(
     "",
@@ -98,9 +94,6 @@ async def create(
     return AgentResponse.model_validate(agent)
 
 
-# =============================================================================
-# GET /agents
-# =============================================================================
 
 @router.get(
     "",
@@ -143,9 +136,6 @@ async def list_all(
     )
 
 
-# =============================================================================
-# GET /agents/{id}
-# =============================================================================
 
 @router.get(
     "/{agent_id}",
@@ -166,9 +156,6 @@ async def get_one(
 
 
 
-# =============================================================================
-# PUT /agents/{id}
-# =============================================================================
 
 @router.put(
     "/{agent_id}",
@@ -187,7 +174,6 @@ async def update_one(
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found.")
 
-    # Name-uniqueness check (if name is being changed)
     if body.name is not None and body.name != agent.name:
         existing = await agent_service.get_agent_by_name(session, body.name)
         if existing is not None:
@@ -209,9 +195,6 @@ async def update_one(
     return AgentResponse.model_validate(updated)
 
 
-# =============================================================================
-# DELETE /agents/{id}
-# =============================================================================
 
 @router.delete(
     "/{agent_id}",
@@ -234,9 +217,6 @@ async def delete_one(
     await agent_service.delete_agent(session, agent)
 
 
-# =============================================================================
-# POST /agents/{id}/freeze
-# =============================================================================
 
 @router.post(
     "/{agent_id}/freeze",
@@ -258,9 +238,6 @@ async def freeze(
     return AgentResponse.model_validate(agent)
 
 
-# =============================================================================
-# POST /agents/{id}/unfreeze
-# =============================================================================
 
 @router.post(
     "/{agent_id}/unfreeze",
@@ -282,9 +259,6 @@ async def unfreeze(
     return AgentResponse.model_validate(agent)
 
 
-# =============================================================================
-# PUT /agents/{id}/policy
-# =============================================================================
 
 @router.put(
     "/{agent_id}/policy",
@@ -297,7 +271,6 @@ omitted fields keep their current values.
 **Changes take effect immediately** — the next payment request will be
 evaluated against the new limits.
 
-### Example
 
     PUT /agents/1/policy
     {
@@ -334,9 +307,6 @@ async def update_policy(
     return AgentResponse.model_validate(updated)
 
 
-# =============================================================================
-# GET /agents/{id}/transactions
-# =============================================================================
 
 from datetime import datetime
 from pydantic import BaseModel
@@ -373,7 +343,6 @@ async def get_agent_transactions(
     from datetime import datetime, timezone
     reqs_data = await session.query("payment_requests", [("agent_id", "==", agent.id)])
     
-    # Sort locally by created_at desc
     def get_created_at(pr_dict):
         ca = pr_dict.get("created_at")
         if ca is None:

@@ -5,7 +5,6 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Minimum ABI for the AgentGuardWallet execute, frozen, and other checks
 WALLET_ABI = [
     {
         "inputs": [],
@@ -77,13 +76,11 @@ async def check_on_chain_status(contract_address: str = None) -> dict:
             
         contract = get_contract(w3, contract_address)
         
-        # Call contract getters in separate threads
         frozen = await asyncio.to_thread(contract.functions.frozen().call)
         per_tx = await asyncio.to_thread(contract.functions.perTxLimit().call)
         period = await asyncio.to_thread(contract.functions.periodLimit().call)
         spent = await asyncio.to_thread(contract.functions.spentThisPeriod().call)
         
-        # Get contract ETH balance
         balance_wei = await asyncio.to_thread(w3.eth.get_balance, contract.address)
         
         return {
@@ -112,7 +109,6 @@ async def execute_on_chain_payment(target_address: str, amount_eth: float, contr
     if not connected:
         raise ConnectionError("Failed to connect to blockchain RPC node.")
 
-    # Get account from private key
     account = w3.eth.account.from_key(settings.AGENT_PRIVATE_KEY)
     agent_address = account.address
 
@@ -125,12 +121,10 @@ async def execute_on_chain_payment(target_address: str, amount_eth: float, contr
         f"target={target_checksum} amount={amount_eth} ETH ({amount_wei} Wei)"
     )
 
-    # Fetch nonce and build transaction
     nonce = await asyncio.to_thread(w3.eth.get_transaction_count, agent_address)
     gas_price = await asyncio.to_thread(lambda: w3.eth.gas_price)
     chain_id = await asyncio.to_thread(lambda: w3.eth.chain_id)
 
-    # Estimate gas (or hardcode/generous estimation for contract interaction)
     tx_data = await asyncio.to_thread(
         contract.functions.execute(
             target_checksum,
@@ -145,17 +139,13 @@ async def execute_on_chain_payment(target_address: str, amount_eth: float, contr
         }
     )
 
-    # Sign transaction
     signed_tx = w3.eth.account.sign_transaction(tx_data, private_key=settings.AGENT_PRIVATE_KEY)
 
-    # Broadcast transaction
     tx_hash = await asyncio.to_thread(w3.eth.send_raw_transaction, signed_tx.raw_transaction)
     logger.info(f"On-chain transaction broadcasted. Hash: {w3.to_hex(tx_hash)}")
     
-    # Wait for confirmation
     tx_receipt = await asyncio.to_thread(w3.eth.wait_for_transaction_receipt, tx_hash)
 
-    # Check if transaction was successful
     if tx_receipt.status != 1:
         raise RuntimeError("On-chain transaction execution reverted.")
 

@@ -3,9 +3,6 @@
 from pydantic import BaseModel, Field
 
 
-# =============================================================================
-# POST /ai/explain-blocked
-# =============================================================================
 
 
 class ExplainBlockedRequest(BaseModel):
@@ -51,9 +48,6 @@ class ExplainBlockedRequest(BaseModel):
     )
 
 
-# =============================================================================
-# POST /ai/explain-policy
-# =============================================================================
 
 
 class ExplainPolicyRequest(BaseModel):
@@ -92,9 +86,6 @@ class ExplainPolicyRequest(BaseModel):
     )
 
 
-# =============================================================================
-# Response schemas
-# =============================================================================
 
 
 class AIExplanation(BaseModel):

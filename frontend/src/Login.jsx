@@ -20,7 +20,6 @@ export default function Login() {
     setProgress(15);
     setLoadingStep(1);
 
-    // Simulate progress updates for a smoother visual feel
     let currentProgress = 15;
     const interval = setInterval(() => {
       currentProgress += Math.floor(Math.random() * 12) + 5;
@@ -30,7 +29,6 @@ export default function Login() {
       }
       setProgress(currentProgress);
 
-      // Update step indices based on progress
       if (currentProgress > 55) {
         setLoadingStep(2);
       }
@@ -42,7 +40,6 @@ export default function Login() {
       setLoadingStep(3); // "Load isolated dashboard data"
       clearInterval(interval);
 
-      // Brief delay to let user see 100% success state
       setTimeout(() => {
         localStorage.setItem("token", data.access_token);
         navigate("/dashboard");

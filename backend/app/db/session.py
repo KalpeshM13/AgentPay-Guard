@@ -5,9 +5,6 @@ Provides a simple base class for models and a FastAPI dependency that yields a F
 
 from app.db.firebase import FirebaseClient
 
-# ---------------------------------------------------------------------------
-# Declarative Base Mock
-# ---------------------------------------------------------------------------
 class Base:
     """Base class for all models, replacing SQLAlchemy DeclarativeBase."""
     
@@ -22,9 +19,6 @@ class Base:
                 data[key] = val
         return data
 
-# ---------------------------------------------------------------------------
-# FastAPI dependency – yields a FirebaseClient
-# ---------------------------------------------------------------------------
 async def get_session():
     """FastAPI dependency that provides a FirebaseClient database session."""
     yield FirebaseClient()

@@ -25,9 +25,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["payments"])
 
 
-# =============================================================================
-# POST /payments
-# =============================================================================
 
 @router.post(
     "/payments",
@@ -57,18 +54,15 @@ async def request_payment(
 ) -> PaymentResponse:
     """Process a payment request through the policy + executor pipeline."""
 
-    # ── 0. Validate amount ─────────────────────────────────────────────
     if body.amount <= 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="amount must be positive.",
         )
 
-    # ── 1. Load entities ───────────────────────────────────────────────
     agent = await agent_service.get_agent_by_id(session, body.agent_id)
     merchant = await merchant_service.get_merchant_by_id(session, body.merchant_id)
 
-    # ── 2. Check allowlist status ──────────────────────────────────────
     is_allowlisted = False
     if agent is not None and merchant is not None:
         entry = await allowlist_service.get_allowlist_entry(
@@ -76,7 +70,6 @@ async def request_payment(
         )
         is_allowlisted = entry is not None
 
-    # ── 3. Policy evaluation ───────────────────────────────────────────
     now = datetime.now(timezone.utc)
     window_start = now - timedelta(minutes=1)
 
@@ -96,8 +89,6 @@ async def request_payment(
 
 
     if not decision.approved:
-        # DUPLICATE_REQUEST is a special case — the original PaymentRequest
-        # already exists with that request_id, so we only write an audit log.
         if decision.reason == 'DUPLICATE_REQUEST':
             await _record_duplicate_blocked(session, body)
         else:
@@ -109,7 +100,6 @@ async def request_payment(
             amount=body.amount,
         )
 
-    # ── 5. Execute (agent is guaranteed non-None by policy check #1) ───
     assert agent is not None, "policy should have rejected missing agent"
     transaction = await execute(
         session=session,
@@ -119,7 +109,6 @@ async def request_payment(
         amount=body.amount,
     )
 
-    # ── 6. Compute remaining daily limit ───────────────────────────────
     spent_today = await get_daily_spend(session, agent.id)
     remaining = max(0.0, agent.daily_limit - spent_today)
 
@@ -132,9 +121,6 @@ async def request_payment(
     )
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
 
 async def _record_duplicate_blocked(
     session,
@@ -177,7 +163,6 @@ async def _record_blocked(
     from app.models.audit_log import AuditLog
     from app.models.payment_request import PaymentRequest
 
-    # Check if this request_id already exists
     results = await session.query("payment_requests", [("request_id", "==", body.request_id)])
 
     if not results:

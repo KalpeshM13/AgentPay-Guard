@@ -8,9 +8,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-# =============================================================================
-# GET /dashboard/summary
-# =============================================================================
 
 
 class DashboardSummary(BaseModel):
@@ -36,9 +33,6 @@ class DashboardSummary(BaseModel):
     today_blocked_count: int = Field(..., examples=[2])
 
 
-# =============================================================================
-# GET /dashboard/activity
-# =============================================================================
 
 
 class ActivityItem(BaseModel):
@@ -99,9 +93,6 @@ class ActivityFilter(BaseModel):
     )
 
 
-# =============================================================================
-# GET /dashboard/audit
-# =============================================================================
 
 
 class AuditItem(BaseModel):

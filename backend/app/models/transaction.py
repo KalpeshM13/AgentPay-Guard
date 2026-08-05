@@ -15,7 +15,6 @@ class Transaction(Base):
         if not hasattr(self, "settled_at"):
             self.settled_at = datetime.now()
 
-        # Convert timestamps from Firestore Timestamp objects
         for attr in ["settled_at"]:
             if hasattr(self, attr):
                 v = getattr(self, attr)

@@ -7,26 +7,17 @@ between deployments – they define the shape of the domain.
 from enum import StrEnum
 
 
-# ---------------------------------------------------------------------------
-# User roles
-# ---------------------------------------------------------------------------
 class UserRole(StrEnum):
     OWNER = "owner"
     ADMIN = "admin"
     VIEWER = "viewer"
 
 
-# ---------------------------------------------------------------------------
-# Agent statuses
-# ---------------------------------------------------------------------------
 class AgentStatus(StrEnum):
     ACTIVE = "ACTIVE"
     FROZEN = "FROZEN"
 
 
-# ---------------------------------------------------------------------------
-# Payment request / transaction statuses
-# ---------------------------------------------------------------------------
 class PaymentStatus(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
@@ -35,10 +26,6 @@ class PaymentStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-# ---------------------------------------------------------------------------
-# Rejection reasons – kept as simple string constants so new reasons can be
-# added without changing an enum definition.
-# ---------------------------------------------------------------------------
 class RejectionReason:
     AGENT_NOT_FOUND = "AGENT_NOT_FOUND"
     AGENT_FROZEN = "AGENT_FROZEN"
@@ -52,9 +39,6 @@ class RejectionReason:
     INSUFFICIENT_BALANCE = "INSUFFICIENT_BALANCE"
 
 
-# ---------------------------------------------------------------------------
-# Audit event types
-# ---------------------------------------------------------------------------
 class AuditEventType(StrEnum):
     AGENT_CREATED = "agent_created"
     AGENT_FROZEN = "agent_frozen"
