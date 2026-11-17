@@ -1,4 +1,6 @@
 const { ethers, network } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const signers = await ethers.getSigners();
@@ -32,6 +34,24 @@ async function main() {
   console.log("🎉 SUCCESS! AgentGuardWallet deployed to:");
   console.log(contractAddress);
   console.log("----------------------------------------------------");
+
+  // Automatically sync contract address into backend/.env
+  try {
+    const envPath = path.resolve(__dirname, "../backend/.env");
+    if (fs.existsSync(envPath)) {
+      let envContent = fs.readFileSync(envPath, "utf8");
+      if (envContent.includes("SMART_CONTRACT_ADDRESS=")) {
+        envContent = envContent.replace(
+          /SMART_CONTRACT_ADDRESS=.*/,
+          `SMART_CONTRACT_ADDRESS="${contractAddress}"`
+        );
+        fs.writeFileSync(envPath, envContent, "utf8");
+        console.log(`Synced SMART_CONTRACT_ADDRESS to backend/.env`);
+      }
+    }
+  } catch (err) {
+    console.warn("Could not auto-sync backend/.env:", err.message);
+  }
 
   const mockMerchantAddresses = [
     "0x1111111111111111111111111111111111111111",
