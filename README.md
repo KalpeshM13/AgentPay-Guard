@@ -311,3 +311,7 @@ AgentPay-Guard/
 **AgentPay Guard** — _Autonomous Agent Payments with Absolute Financial Integrity._
 
 </div>
+
+## LICENSE
+
+This project is licensed under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for the full license text. Developed for university campus operations, educational governance research, and competitive hackathon evaluation.
